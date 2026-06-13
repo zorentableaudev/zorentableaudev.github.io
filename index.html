@@ -3,1126 +3,1065 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Zoren Cordon | Tableau Developer & BI Consultant</title>
-  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@600;700;800&family=Outfit:wght@300;400;500;600&display=swap" rel="stylesheet" />
+  <title>Zoren Cordon — Tableau Developer & BI Consultant</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet" />
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
     :root {
-      --bg:        #090B10;
-      --bg-card:   #101318;
-      --bg-raise:  #161A22;
-      --teal:      #00C9B1;
-      --teal-dim:  rgba(0,201,177,.12);
-      --blue:      #4F8EF7;
-      --blue-dim:  rgba(79,142,247,.10);
-      --txt:       #DDE1EF;
-      --txt-muted: #6B7091;
-      --border:    rgba(255,255,255,.06);
-      --radius:    14px;
+      --navy: #0B1426;
+      --navy-mid: #152040;
+      --navy-light: #1E2D50;
+      --teal: #00D4C8;
+      --teal-dim: #00B8AD;
+      --teal-glow: rgba(0, 212, 200, 0.15);
+      --amber: #F5A623;
+      --off-white: #F0EDE8;
+      --slate: #8A9AB8;
+      --slate-light: #B8C4D8;
+      --white: #FFFFFF;
     }
 
     html { scroll-behavior: smooth; }
 
     body {
-      background: var(--bg);
-      color: var(--txt);
-      font-family: 'Outfit', sans-serif;
-      font-weight: 400;
-      line-height: 1.7;
+      font-family: 'Bahnschrift', 'DIN Alternate', 'Inter', sans-serif;
+      background: var(--navy);
+      color: var(--off-white);
+      line-height: 1.6;
       overflow-x: hidden;
     }
 
-    /* ── GRID BACKGROUND ── */
-    body::before {
-      content: '';
-      position: fixed;
-      inset: 0;
-      background-image:
-        linear-gradient(rgba(0,201,177,.03) 1px, transparent 1px),
-        linear-gradient(90deg, rgba(0,201,177,.03) 1px, transparent 1px);
-      background-size: 48px 48px;
-      pointer-events: none;
-      z-index: 0;
-    }
+    /* Utility: use Inter only for body text, Bahnschrift SemiCondensed for headings/display */
+    .body-font { font-family: 'Inter', sans-serif; }
 
     /* ── NAV ── */
     nav {
-      position: fixed;
-      top: 0; left: 0; right: 0;
-      z-index: 100;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding: 18px 6vw;
-      background: rgba(9,11,16,.85);
-      backdrop-filter: blur(14px);
-      border-bottom: 1px solid var(--border);
+      position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+      padding: 18px 5%;
+      display: flex; justify-content: space-between; align-items: center;
+      background: rgba(11, 20, 38, 0.85);
+      backdrop-filter: blur(12px);
+      border-bottom: 1px solid rgba(0, 212, 200, 0.1);
     }
-
     .nav-logo {
-      font-family: 'Syne', sans-serif;
-      font-size: 1.15rem;
+      font-family: 'Bahnschrift', 'DIN Alternate', sans-serif;
+      font-variation-settings: "wdth" 75;
       font-weight: 700;
-      color: var(--teal);
-      letter-spacing: .5px;
-      text-decoration: none;
+      font-size: 1.2rem;
+      color: var(--white);
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
     }
-
-    .nav-links { display: flex; gap: 2rem; list-style: none; }
+    .nav-logo span { color: var(--teal); }
+    .nav-links { display: flex; gap: 32px; list-style: none; }
     .nav-links a {
-      color: var(--txt-muted);
+      font-family: 'Bahnschrift', 'DIN Alternate', sans-serif;
+      font-size: 0.82rem;
+      font-weight: 600;
+      color: var(--slate-light);
       text-decoration: none;
-      font-size: .88rem;
-      font-weight: 500;
-      letter-spacing: .3px;
-      transition: color .2s;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      transition: color 0.2s;
     }
     .nav-links a:hover { color: var(--teal); }
-
-    /* ── SECTIONS ── */
-    section { position: relative; z-index: 1; padding: 100px 6vw; }
-    section:first-of-type { padding-top: 140px; }
-
-    .section-label {
-      font-size: .75rem;
-      font-weight: 600;
-      letter-spacing: 2.5px;
-      text-transform: uppercase;
-      color: var(--teal);
-      margin-bottom: 12px;
+    .nav-cta {
+      background: var(--teal);
+      color: var(--navy) !important;
+      padding: 8px 20px;
+      border-radius: 4px;
+      transition: background 0.2s !important;
     }
-
-    h2.section-title {
-      font-family: 'Syne', sans-serif;
-      font-size: clamp(2rem, 4vw, 2.8rem);
-      font-weight: 800;
-      color: var(--txt);
-      line-height: 1.15;
-      margin-bottom: 48px;
-    }
-
-    h2.section-title span { color: var(--teal); }
+    .nav-cta:hover { background: var(--teal-dim) !important; color: var(--navy) !important; }
 
     /* ── HERO ── */
-    #hero {
+    .hero {
       min-height: 100vh;
-      display: flex;
-      flex-direction: column;
-      justify-content: center;
-      padding-top: 120px;
-      padding-bottom: 80px;
-      max-width: 900px;
+      padding: 120px 5% 80px;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 60px;
+      align-items: center;
+      position: relative;
+      overflow: hidden;
+    }
+    .hero::before {
+      content: '';
+      position: absolute; inset: 0;
+      background: radial-gradient(ellipse 70% 60% at 70% 50%, rgba(0, 212, 200, 0.07) 0%, transparent 70%);
+      pointer-events: none;
     }
 
     .hero-eyebrow {
-      display: inline-flex;
-      align-items: center;
-      gap: 8px;
-      font-size: .8rem;
+      font-family: 'Bahnschrift', 'DIN Alternate', sans-serif;
+      font-size: 0.78rem;
       font-weight: 600;
-      letter-spacing: 2px;
+      letter-spacing: 0.14em;
       text-transform: uppercase;
       color: var(--teal);
-      margin-bottom: 24px;
+      margin-bottom: 20px;
+      display: flex; align-items: center; gap: 10px;
     }
-
     .hero-eyebrow::before {
       content: '';
-      display: block;
-      width: 28px; height: 2px;
+      display: block; width: 28px; height: 2px;
       background: var(--teal);
-      border-radius: 2px;
     }
 
-    h1 {
-      font-family: 'Syne', sans-serif;
-      font-size: clamp(3rem, 7vw, 5.5rem);
-      font-weight: 800;
+    .hero-headline {
+      font-family: 'Bahnschrift', 'DIN Alternate', sans-serif;
+      font-variation-settings: "wdth" 75;
+      font-size: clamp(2.4rem, 4vw, 3.8rem);
+      font-weight: 700;
       line-height: 1.05;
-      color: var(--txt);
-      margin-bottom: 28px;
+      color: var(--white);
+      margin-bottom: 24px;
+      letter-spacing: -0.01em;
+    }
+    .hero-headline em {
+      font-style: normal;
+      color: var(--teal);
     }
 
-    h1 .accent { color: var(--teal); }
-
-    .hero-tagline {
-      font-size: clamp(1rem, 2vw, 1.2rem);
-      color: var(--txt-muted);
-      max-width: 620px;
-      margin-bottom: 48px;
-      font-weight: 400;
+    .hero-sub {
+      font-family: 'Inter', sans-serif;
+      font-size: 1.05rem;
+      color: var(--slate-light);
+      max-width: 480px;
+      margin-bottom: 36px;
       line-height: 1.7;
     }
 
-    .hero-cta {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 16px;
-      align-items: center;
-    }
+    .hero-actions { display: flex; gap: 16px; flex-wrap: wrap; }
 
     .btn-primary {
-      display: inline-flex;
-      align-items: center;
-      gap: 8px;
-      padding: 14px 32px;
       background: var(--teal);
-      color: #090B10;
-      border-radius: 8px;
+      color: var(--navy);
+      font-family: 'Bahnschrift', 'DIN Alternate', sans-serif;
       font-weight: 700;
-      font-size: .95rem;
+      font-size: 0.92rem;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      padding: 14px 28px;
+      border-radius: 5px;
       text-decoration: none;
-      letter-spacing: .3px;
-      transition: transform .2s, box-shadow .2s;
-      box-shadow: 0 0 28px rgba(0,201,177,.25);
+      transition: background 0.2s, transform 0.15s;
+      display: inline-block;
     }
+    .btn-primary:hover { background: var(--teal-dim); transform: translateY(-2px); }
 
-    .btn-primary:hover {
-      transform: translateY(-2px);
-      box-shadow: 0 0 40px rgba(0,201,177,.4);
-    }
-
-    .btn-secondary {
-      display: inline-flex;
-      align-items: center;
-      gap: 8px;
-      padding: 14px 32px;
-      border: 1px solid rgba(0,201,177,.35);
+    .btn-ghost {
+      border: 1.5px solid rgba(0, 212, 200, 0.4);
       color: var(--teal);
-      border-radius: 8px;
+      font-family: 'Bahnschrift', 'DIN Alternate', sans-serif;
       font-weight: 600;
-      font-size: .95rem;
+      font-size: 0.92rem;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      padding: 14px 28px;
+      border-radius: 5px;
       text-decoration: none;
-      letter-spacing: .3px;
-      transition: background .2s, border-color .2s;
+      transition: border-color 0.2s, background 0.2s;
+      display: inline-block;
     }
+    .btn-ghost:hover { border-color: var(--teal); background: var(--teal-glow); }
 
-    .btn-secondary:hover {
-      background: var(--teal-dim);
-      border-color: var(--teal);
-    }
-
-    .hero-stats {
-      display: flex;
+    .hero-trust {
+      display: flex; align-items: center; gap: 20px;
+      margin-top: 40px; padding-top: 32px;
+      border-top: 1px solid rgba(255,255,255,0.07);
       flex-wrap: wrap;
-      gap: 40px;
-      margin-top: 72px;
-      padding-top: 40px;
-      border-top: 1px solid var(--border);
+    }
+    .trust-badge {
+      font-family: 'Inter', sans-serif;
+      font-size: 0.76rem;
+      color: var(--slate);
+      display: flex; align-items: center; gap: 7px;
+    }
+    .trust-sep { width: 1px; height: 24px; background: rgba(255,255,255,0.1); }
+
+    /* ── DASHBOARD MOCKUP ── */
+    .dashboard-mock {
+      background: var(--navy-mid);
+      border: 1px solid rgba(0, 212, 200, 0.2);
+      border-radius: 12px;
+      padding: 24px;
+      box-shadow: 0 24px 80px rgba(0, 0, 0, 0.5), 0 0 40px rgba(0, 212, 200, 0.06);
+      position: relative;
+    }
+    .db-titlebar {
+      display: flex; align-items: center; gap: 8px;
+      margin-bottom: 20px; padding-bottom: 16px;
+      border-bottom: 1px solid rgba(255,255,255,0.06);
+    }
+    .db-dot { width: 10px; height: 10px; border-radius: 50%; }
+    .db-title {
+      font-family: 'Bahnschrift', 'DIN Alternate', sans-serif;
+      font-size: 0.75rem;
+      font-weight: 600;
+      color: var(--slate);
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      margin-left: 6px;
+    }
+    .db-kpi-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 16px; }
+    .db-kpi {
+      background: var(--navy-light);
+      border-radius: 8px;
+      padding: 14px 16px;
+      border: 1px solid rgba(255,255,255,0.05);
+    }
+    .db-kpi-label {
+      font-family: 'Bahnschrift', 'DIN Alternate', sans-serif;
+      font-size: 0.65rem;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: var(--slate);
+      margin-bottom: 6px;
+    }
+    .db-kpi-value {
+      font-family: 'Bahnschrift', 'DIN Alternate', sans-serif;
+      font-size: 1.4rem;
+      font-weight: 700;
+      color: var(--white);
+    }
+    .db-kpi-delta { font-family: 'Inter', sans-serif; font-size: 0.7rem; font-weight: 500; margin-top: 4px; }
+    .delta-up { color: #4ADE80; }
+    .delta-down { color: #F87171; }
+
+    .db-chart-area {
+      background: var(--navy-light);
+      border-radius: 8px;
+      padding: 14px 16px;
+      border: 1px solid rgba(255,255,255,0.05);
+      margin-bottom: 14px;
+    }
+    .db-chart-label {
+      font-family: 'Bahnschrift', 'DIN Alternate', sans-serif;
+      font-size: 0.65rem;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--slate);
+      margin-bottom: 12px;
+    }
+    .sparkline-svg { width: 100%; height: 60px; }
+
+    .db-signal-row { display: flex; gap: 8px; flex-wrap: wrap; }
+    .db-signal {
+      font-family: 'Bahnschrift', 'DIN Alternate', sans-serif;
+      font-size: 0.62rem;
+      font-weight: 600;
+      padding: 4px 10px;
+      border-radius: 20px;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+    }
+    .sig-scale { background: rgba(74, 222, 128, 0.15); color: #4ADE80; border: 1px solid rgba(74,222,128,0.3); }
+    .sig-pause { background: rgba(248, 113, 113, 0.15); color: #F87171; border: 1px solid rgba(248,113,113,0.3); }
+    .sig-monitor { background: rgba(245, 166, 35, 0.15); color: var(--amber); border: 1px solid rgba(245,166,35,0.3); }
+
+    @keyframes kpiPulse {
+      0%, 100% { border-color: rgba(0, 212, 200, 0.08); }
+      50% { border-color: rgba(0, 212, 200, 0.45); box-shadow: 0 0 12px rgba(0,212,200,0.12); }
+    }
+    .db-kpi:first-child { animation: kpiPulse 3s ease-in-out infinite; }
+
+    /* ── TRUST BAR ── */
+    .trust-bar {
+      padding: 28px 5%;
+      border-top: 1px solid rgba(255,255,255,0.05);
+      border-bottom: 1px solid rgba(255,255,255,0.05);
+      display: flex; align-items: center; justify-content: center; gap: 48px;
+      flex-wrap: wrap;
+    }
+    .trust-item {
+      font-family: 'Bahnschrift', 'DIN Alternate', sans-serif;
+      font-size: 0.76rem;
+      font-weight: 700;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--slate);
+      opacity: 0.6;
     }
 
-    .stat-num {
-      font-family: 'Syne', sans-serif;
-      font-size: 2.4rem;
-      font-weight: 800;
+    /* ── SECTION COMMONS ── */
+    section { padding: 90px 5%; }
+
+    .section-eyebrow {
+      font-family: 'Bahnschrift', 'DIN Alternate', sans-serif;
+      font-size: 0.76rem;
+      font-weight: 600;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
       color: var(--teal);
-      line-height: 1;
+      margin-bottom: 14px;
     }
-
-    .stat-label {
-      font-size: .82rem;
-      color: var(--txt-muted);
-      margin-top: 4px;
-      font-weight: 400;
+    .section-heading {
+      font-family: 'Bahnschrift', 'DIN Alternate', sans-serif;
+      font-variation-settings: "wdth" 75;
+      font-size: clamp(1.8rem, 3vw, 2.7rem);
+      font-weight: 700;
+      color: var(--white);
+      line-height: 1.1;
+      max-width: 640px;
+      margin-bottom: 16px;
+      letter-spacing: -0.01em;
+    }
+    .section-sub {
+      font-family: 'Inter', sans-serif;
+      color: var(--slate-light);
+      max-width: 560px;
+      font-size: 1rem;
+      margin-bottom: 52px;
+      line-height: 1.7;
     }
 
     /* ── ABOUT ── */
-    #about .about-grid {
+    .about-grid {
       display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 60px;
+      grid-template-columns: 340px 1fr;
+      gap: 64px;
       align-items: start;
     }
 
-    .about-text p {
-      color: var(--txt-muted);
-      font-size: 1.05rem;
-      margin-bottom: 20px;
-    }
+    /* Photo column */
+    .about-photo-col { display: flex; flex-direction: column; align-items: center; gap: 24px; }
 
-    .about-text p strong { color: var(--txt); font-weight: 600; }
-
-    .about-highlights { display: flex; flex-direction: column; gap: 16px; }
-
-    .highlight-card {
-      background: var(--bg-card);
-      border: 1px solid var(--border);
-      border-radius: var(--radius);
-      padding: 20px 24px;
-      display: flex;
-      align-items: flex-start;
-      gap: 16px;
-      transition: border-color .2s, transform .2s;
-    }
-
-    .highlight-card:hover {
-      border-color: rgba(0,201,177,.3);
-      transform: translateX(4px);
-    }
-
-    .highlight-icon {
-      font-size: 1.5rem;
+    .photo-frame {
+      position: relative;
+      width: 280px;
+      height: 280px;
       flex-shrink: 0;
+    }
+    .photo-frame::before {
+      content: '';
+      position: absolute;
+      inset: -4px;
+      border-radius: 50%;
+      background: conic-gradient(from 200deg, var(--teal), transparent 40%, var(--teal) 80%);
+      z-index: 0;
+      animation: rotateBorder 6s linear infinite;
+    }
+    @keyframes rotateBorder {
+      to { transform: rotate(360deg); }
+    }
+    .photo-frame img {
+      position: relative; z-index: 1;
+      width: 100%; height: 100%;
+      border-radius: 50%;
+      object-fit: cover;
+      object-position: center top;
+      border: 4px solid var(--navy-mid);
+    }
+
+    .photo-name {
+      font-family: 'Bahnschrift', 'DIN Alternate', sans-serif;
+      font-weight: 700;
+      font-size: 1.15rem;
+      color: var(--white);
+      text-align: center;
+      letter-spacing: 0.04em;
+    }
+    .photo-title {
+      font-family: 'Inter', sans-serif;
+      font-size: 0.82rem;
+      color: var(--teal);
+      text-align: center;
+      margin-top: 4px;
+      letter-spacing: 0.02em;
+    }
+
+    .cert-badges { display: flex; flex-direction: column; gap: 10px; width: 100%; }
+    .cert-badge {
+      display: flex; align-items: center; gap: 12px;
+      background: var(--navy-mid);
+      border: 1px solid rgba(255,255,255,0.07);
+      border-radius: 8px;
+      padding: 12px 16px;
+    }
+    .cert-icon {
+      width: 36px; height: 36px; border-radius: 6px;
+      background: var(--teal-glow);
+      border: 1px solid rgba(0,212,200,0.3);
+      display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0;
+    }
+    .cert-text {
+      font-family: 'Bahnschrift', 'DIN Alternate', sans-serif;
+      font-size: 0.82rem;
+      color: var(--off-white);
+      font-weight: 600;
+    }
+    .cert-sub {
+      font-family: 'Inter', sans-serif;
+      font-size: 0.7rem;
+      color: var(--slate);
       margin-top: 2px;
     }
 
-    .highlight-card h4 {
-      font-family: 'Syne', sans-serif;
-      font-size: .95rem;
+    /* About right column */
+    .about-about-stats {
+      display: grid; grid-template-columns: 1fr 1fr; gap: 20px;
+      margin-top: 28px;
+    }
+    .stat-card {
+      border-left: 3px solid var(--teal);
+      padding: 14px 18px;
+    }
+    .stat-num {
+      font-family: 'Bahnschrift', 'DIN Alternate', sans-serif;
+      font-size: 2rem;
       font-weight: 700;
-      color: var(--txt);
-      margin-bottom: 4px;
+      color: var(--white);
+    }
+    .stat-num span { color: var(--teal); }
+    .stat-label {
+      font-family: 'Inter', sans-serif;
+      font-size: 0.78rem;
+      color: var(--slate);
+      margin-top: 4px;
     }
 
-    .highlight-card p { font-size: .85rem; color: var(--txt-muted); margin: 0; }
+    .stack-pills { display: flex; flex-wrap: wrap; gap: 9px; margin-top: 24px; }
+    .pill {
+      font-family: 'Bahnschrift', 'DIN Alternate', sans-serif;
+      font-size: 0.72rem;
+      font-weight: 600;
+      letter-spacing: 0.04em;
+      padding: 5px 13px;
+      border-radius: 20px;
+      background: rgba(0, 212, 200, 0.08);
+      border: 1px solid rgba(0, 212, 200, 0.2);
+      color: var(--teal);
+    }
 
     /* ── SERVICES ── */
-    #services { background: rgba(255,255,255,.01); }
-
-    .services-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-      gap: 20px;
-    }
-
+    #services { background: var(--navy-mid); }
+    .services-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px; }
     .service-card {
-      background: var(--bg-card);
-      border: 1px solid var(--border);
-      border-radius: var(--radius);
-      padding: 28px;
-      position: relative;
-      overflow: hidden;
-      transition: border-color .2s, transform .2s;
+      background: var(--navy);
+      border: 1px solid rgba(255,255,255,0.07);
+      border-radius: 10px;
+      padding: 30px 28px;
+      transition: border-color 0.25s, transform 0.2s;
+      position: relative; overflow: hidden;
     }
-
-    .service-card::before {
+    .service-card::after {
       content: '';
-      position: absolute;
-      top: 0; left: 0; right: 0;
-      height: 2px;
+      position: absolute; top: 0; left: 0; right: 0; height: 3px;
       background: linear-gradient(90deg, var(--teal), transparent);
       opacity: 0;
-      transition: opacity .2s;
+      transition: opacity 0.25s;
     }
-
-    .service-card:hover {
-      border-color: rgba(0,201,177,.3);
-      transform: translateY(-4px);
-    }
-
-    .service-card:hover::before { opacity: 1; }
+    .service-card:hover { border-color: rgba(0, 212, 200, 0.3); transform: translateY(-4px); }
+    .service-card:hover::after { opacity: 1; }
 
     .service-icon {
-      font-size: 1.8rem;
-      margin-bottom: 16px;
-      display: block;
+      width: 46px; height: 46px;
+      background: var(--teal-glow);
+      border: 1px solid rgba(0,212,200,0.25);
+      border-radius: 8px;
+      display: flex; align-items: center; justify-content: center;
+      margin-bottom: 20px;
     }
-
-    .service-card h3 {
-      font-family: 'Syne', sans-serif;
-      font-size: 1rem;
+    .service-title {
+      font-family: 'Bahnschrift', 'DIN Alternate', sans-serif;
       font-weight: 700;
-      color: var(--txt);
+      font-size: 1rem;
+      color: var(--white);
       margin-bottom: 10px;
+      letter-spacing: 0.02em;
     }
-
-    .service-card p { font-size: .85rem; color: var(--txt-muted); }
-
-    /* ── TECH STACK ── */
-    .stack-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
-      gap: 16px;
+    .service-desc {
+      font-family: 'Inter', sans-serif;
+      font-size: 0.875rem;
+      color: var(--slate-light);
+      line-height: 1.65;
     }
-
-    .stack-item {
-      background: var(--bg-card);
-      border: 1px solid var(--border);
-      border-radius: var(--radius);
-      padding: 20px;
-      text-align: center;
-      transition: border-color .2s, transform .2s;
-    }
-
-    .stack-item:hover {
-      border-color: rgba(0,201,177,.35);
-      transform: translateY(-3px);
-    }
-
-    .stack-item .stack-icon { font-size: 2rem; margin-bottom: 10px; display: block; }
-
-    .stack-item span {
-      font-size: .82rem;
+    .service-tag {
+      font-family: 'Bahnschrift', 'DIN Alternate', sans-serif;
+      margin-top: 18px;
+      font-size: 0.68rem;
       font-weight: 600;
-      color: var(--txt-muted);
-      display: block;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--teal);
+      opacity: 0.7;
     }
 
-    /* ── PORTFOLIO ── */
-    #portfolio { background: rgba(255,255,255,.01); }
-
-    .portfolio-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
-      gap: 24px;
-    }
-
-    .portfolio-card {
-      background: var(--bg-card);
-      border: 1px solid var(--border);
-      border-radius: var(--radius);
-      overflow: hidden;
-      transition: border-color .2s, transform .2s;
-    }
-
-    .portfolio-card:hover {
-      border-color: rgba(0,201,177,.35);
-      transform: translateY(-5px);
-    }
-
-    .portfolio-thumb {
-      height: 180px;
-      background: var(--bg-raise);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 3.5rem;
-      border-bottom: 1px solid var(--border);
-      position: relative;
-      overflow: hidden;
-    }
-
-    .portfolio-thumb::after {
+    /* ── PROCESS ── */
+    .process-steps { display: grid; grid-template-columns: repeat(4, 1fr); gap: 0; position: relative; }
+    .process-steps::before {
       content: '';
       position: absolute;
-      inset: 0;
-      background: linear-gradient(135deg, var(--teal-dim), var(--blue-dim));
+      top: 28px; left: 12.5%; right: 12.5%;
+      height: 1px;
+      background: linear-gradient(90deg, transparent, var(--teal), var(--teal), transparent);
+      opacity: 0.25;
     }
-
-    .portfolio-body { padding: 24px; }
-
-    .portfolio-tag {
-      display: inline-block;
-      font-size: .72rem;
-      font-weight: 600;
-      letter-spacing: 1.5px;
-      text-transform: uppercase;
-      color: var(--teal);
-      background: var(--teal-dim);
-      border-radius: 4px;
-      padding: 3px 10px;
-      margin-bottom: 12px;
-    }
-
-    .portfolio-card h3 {
-      font-family: 'Syne', sans-serif;
-      font-size: 1.05rem;
-      font-weight: 700;
-      color: var(--txt);
-      margin-bottom: 10px;
-    }
-
-    .portfolio-card p { font-size: .85rem; color: var(--txt-muted); }
-
-    /* ── CERTIFICATIONS ── */
-    .certs-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
-      gap: 20px;
-    }
-
-    .cert-card {
-      background: var(--bg-card);
-      border: 1px solid var(--border);
-      border-radius: var(--radius);
-      padding: 24px;
-      display: flex;
-      align-items: center;
-      gap: 18px;
-      transition: border-color .2s;
-    }
-
-    .cert-card:hover { border-color: rgba(0,201,177,.3); }
-
-    .cert-badge {
-      width: 52px; height: 52px;
-      background: var(--teal-dim);
-      border-radius: 12px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 1.5rem;
-      flex-shrink: 0;
-      border: 1px solid rgba(0,201,177,.2);
-    }
-
-    .cert-card h4 {
-      font-family: 'Syne', sans-serif;
-      font-size: .92rem;
-      font-weight: 700;
-      color: var(--txt);
-      margin-bottom: 4px;
-    }
-
-    .cert-card p { font-size: .8rem; color: var(--txt-muted); }
-
-    .cert-placeholder {
-      border-style: dashed;
-      opacity: .5;
-    }
-
-    /* ── TESTIMONIALS ── */
-    #testimonials { background: rgba(255,255,255,.01); }
-
-    .testimonials-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-      gap: 24px;
-    }
-
-    .testimonial-card {
-      background: var(--bg-card);
-      border: 1px solid var(--border);
-      border-radius: var(--radius);
-      padding: 28px;
-      position: relative;
-      border-style: dashed;
-      opacity: .55;
-      display: flex;
-      flex-direction: column;
-      gap: 16px;
-    }
-
-    .testimonial-card .quote-icon {
-      font-size: 2rem;
-      color: var(--teal);
-      opacity: .4;
-      line-height: 1;
-    }
-
-    .testimonial-placeholder {
-      font-size: .9rem;
-      color: var(--txt-muted);
-      font-style: italic;
-    }
-
-    .testimonial-author {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-      margin-top: auto;
-    }
-
-    .author-avatar {
-      width: 40px; height: 40px;
-      background: var(--bg-raise);
+    .process-step { padding: 0 20px; text-align: center; }
+    .step-num {
+      width: 56px; height: 56px;
       border-radius: 50%;
-      display: flex;
-      align-items: center;
-      justify-content: center;
+      background: var(--navy-mid);
+      border: 1.5px solid rgba(0,212,200,0.3);
+      display: flex; align-items: center; justify-content: center;
+      margin: 0 auto 20px;
+      font-family: 'Bahnschrift', 'DIN Alternate', sans-serif;
+      font-weight: 800;
       font-size: 1.1rem;
-      border: 1px solid var(--border);
+      color: var(--teal);
+      position: relative; z-index: 1;
     }
-
-    .author-name { font-size: .85rem; font-weight: 600; color: var(--txt-muted); }
-    .author-title { font-size: .75rem; color: var(--txt-muted); opacity: .6; }
-
-    /* ── CONTACT ── */
-    .contact-wrap {
-      display: grid;
-      grid-template-columns: 1fr 1.5fr;
-      gap: 60px;
-      align-items: start;
-    }
-
-    .contact-info h3 {
-      font-family: 'Syne', sans-serif;
-      font-size: 1.4rem;
+    .step-title {
+      font-family: 'Bahnschrift', 'DIN Alternate', sans-serif;
       font-weight: 700;
-      margin-bottom: 16px;
-      color: var(--txt);
+      font-size: 0.95rem;
+      color: var(--white);
+      margin-bottom: 10px;
+      letter-spacing: 0.04em;
+    }
+    .step-desc {
+      font-family: 'Inter', sans-serif;
+      font-size: 0.82rem;
+      color: var(--slate);
+      line-height: 1.6;
     }
 
-    .contact-info p { color: var(--txt-muted); font-size: .95rem; margin-bottom: 32px; }
-
-    .contact-detail {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-      margin-bottom: 16px;
-    }
-
-    .contact-detail-icon {
-      width: 40px; height: 40px;
-      background: var(--teal-dim);
+    /* ── INDUSTRIES ── */
+    #industries { background: var(--navy-mid); }
+    .industries-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px; }
+    .industry-card {
+      background: var(--navy);
+      border: 1px solid rgba(255,255,255,0.07);
       border-radius: 10px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 1rem;
-      flex-shrink: 0;
-      border: 1px solid rgba(0,201,177,.15);
+      padding: 26px 28px;
+      display: flex; gap: 18px; align-items: flex-start;
     }
-
-    .contact-detail span { font-size: .88rem; color: var(--txt-muted); }
-    .contact-detail a { font-size: .88rem; color: var(--teal); text-decoration: none; }
-    .contact-detail a:hover { text-decoration: underline; }
-
-    /* FORM */
-    .contact-form {
-      background: var(--bg-card);
-      border: 1px solid var(--border);
-      border-radius: var(--radius);
-      padding: 36px;
-    }
-
-    .form-row {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 16px;
-    }
-
-    .form-group { margin-bottom: 20px; }
-
-    .form-group label {
-      display: block;
-      font-size: .8rem;
-      font-weight: 600;
-      letter-spacing: .8px;
-      text-transform: uppercase;
-      color: var(--txt-muted);
+    .ind-icon { font-size: 1.6rem; flex-shrink: 0; line-height: 1; margin-top: 3px; }
+    .ind-title {
+      font-family: 'Bahnschrift', 'DIN Alternate', sans-serif;
+      font-weight: 700;
+      font-size: 0.95rem;
+      color: var(--white);
       margin-bottom: 8px;
+      letter-spacing: 0.02em;
+    }
+    .ind-desc {
+      font-family: 'Inter', sans-serif;
+      font-size: 0.82rem;
+      color: var(--slate-light);
+      line-height: 1.6;
     }
 
-    .form-group input,
-    .form-group select,
-    .form-group textarea {
-      width: 100%;
-      background: var(--bg-raise);
-      border: 1px solid var(--border);
-      border-radius: 8px;
+    /* ── TESTIMONIAL ── */
+    .testimonial-block {
+      background: var(--navy-mid);
+      border: 1px solid rgba(0,212,200,0.15);
+      border-radius: 14px;
+      padding: 52px 56px;
+      text-align: center;
+      max-width: 780px; margin: 0 auto;
+      position: relative;
+    }
+    .testimonial-block::before {
+      content: '"';
+      font-family: 'Bahnschrift', 'DIN Alternate', sans-serif;
+      font-size: 8rem;
+      line-height: 0.7;
+      color: var(--teal);
+      opacity: 0.12;
+      position: absolute; top: 24px; left: 32px;
+    }
+    .testimonial-text {
+      font-family: 'Inter', sans-serif;
+      font-size: 1.1rem;
+      line-height: 1.75;
+      color: var(--off-white);
+      font-style: italic;
+      margin-bottom: 28px;
+    }
+    .testimonial-author {
+      font-family: 'Bahnschrift', 'DIN Alternate', sans-serif;
+      font-weight: 700;
+      font-size: 0.9rem;
+      color: var(--white);
+      letter-spacing: 0.04em;
+    }
+    .testimonial-role {
+      font-family: 'Inter', sans-serif;
+      font-size: 0.8rem;
+      color: var(--slate);
+      margin-top: 4px;
+    }
+
+    /* ── CTA / CONTACT ── */
+    #contact { background: var(--navy-mid); text-align: center; }
+    .cta-block { max-width: 640px; margin: 0 auto; }
+    .cta-block .section-heading, .cta-block .section-sub { max-width: 100%; text-align: center; margin-left: auto; margin-right: auto; }
+
+    .contact-form {
+      background: var(--navy);
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 12px;
+      padding: 36px 40px;
+      margin-top: 40px;
+      text-align: left;
+    }
+    .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px; }
+    .form-group { display: flex; flex-direction: column; gap: 7px; margin-bottom: 16px; }
+    .form-label {
+      font-family: 'Bahnschrift', 'DIN Alternate', sans-serif;
+      font-size: 0.75rem;
+      font-weight: 600;
+      color: var(--slate-light);
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+    .form-input, .form-textarea, .form-select {
+      background: var(--navy-mid);
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 6px;
       padding: 12px 16px;
-      color: var(--txt);
-      font-family: 'Outfit', sans-serif;
-      font-size: .9rem;
+      color: var(--off-white);
+      font-family: 'Inter', sans-serif;
+      font-size: 0.9rem;
       outline: none;
-      transition: border-color .2s, box-shadow .2s;
-      appearance: none;
+      transition: border-color 0.2s;
+      width: 100%;
     }
-
-    .form-group select option { background: #161A22; }
-
-    .form-group input:focus,
-    .form-group select:focus,
-    .form-group textarea:focus {
-      border-color: var(--teal);
-      box-shadow: 0 0 0 3px rgba(0,201,177,.1);
-    }
-
-    .form-group textarea { resize: vertical; min-height: 120px; }
-
+    .form-input:focus, .form-textarea:focus, .form-select:focus { border-color: var(--teal); }
+    .form-select { cursor: pointer; }
+    option { background: var(--navy-mid); }
+    .form-textarea { resize: vertical; min-height: 110px; }
     .form-submit {
       width: 100%;
-      padding: 14px;
       background: var(--teal);
-      color: #090B10;
-      border: none;
-      border-radius: 8px;
-      font-family: 'Outfit', sans-serif;
-      font-size: .95rem;
+      color: var(--navy);
+      font-family: 'Bahnschrift', 'DIN Alternate', sans-serif;
       font-weight: 700;
+      font-size: 0.95rem;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      padding: 15px;
+      border: none;
+      border-radius: 6px;
       cursor: pointer;
-      letter-spacing: .3px;
-      transition: transform .2s, box-shadow .2s;
-      box-shadow: 0 0 24px rgba(0,201,177,.2);
+      transition: background 0.2s, transform 0.15s;
+      margin-top: 8px;
     }
+    .form-submit:hover { background: var(--teal-dim); transform: translateY(-1px); }
 
-    .form-submit:hover {
-      transform: translateY(-2px);
-      box-shadow: 0 0 36px rgba(0,201,177,.35);
+    .contact-alternatives {
+      display: flex; justify-content: center; gap: 32px;
+      margin-top: 28px; flex-wrap: wrap;
     }
+    .contact-alt-item {
+      font-family: 'Inter', sans-serif;
+      display: flex; align-items: center; gap: 8px;
+      font-size: 0.85rem;
+      color: var(--slate-light);
+      text-decoration: none;
+      transition: color 0.2s;
+    }
+    .contact-alt-item:hover { color: var(--teal); }
 
     /* ── FOOTER ── */
     footer {
-      position: relative;
-      z-index: 1;
-      border-top: 1px solid var(--border);
-      padding: 32px 6vw;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      flex-wrap: wrap;
-      gap: 16px;
+      padding: 28px 5%;
+      border-top: 1px solid rgba(255,255,255,0.06);
+      display: flex; justify-content: space-between; align-items: center;
+      flex-wrap: wrap; gap: 12px;
     }
-
-    .footer-logo {
-      font-family: 'Syne', sans-serif;
-      font-size: 1rem;
+    .footer-brand {
+      font-family: 'Bahnschrift', 'DIN Alternate', sans-serif;
       font-weight: 700;
-      color: var(--teal);
+      font-size: 0.9rem;
+      color: var(--slate);
+      letter-spacing: 0.04em;
+    }
+    .footer-brand span { color: var(--teal); }
+    .footer-copy {
+      font-family: 'Inter', sans-serif;
+      font-size: 0.78rem;
+      color: var(--slate);
+      opacity: 0.6;
     }
 
-    .footer-copy { font-size: .82rem; color: var(--txt-muted); }
-
-    .footer-links { display: flex; gap: 20px; }
-
-    .footer-links a {
-      font-size: .82rem;
-      color: var(--txt-muted);
-      text-decoration: none;
-      transition: color .2s;
-    }
-
-    .footer-links a:hover { color: var(--teal); }
-
-    /* ── SCROLL ANIMATIONS ── */
-    .reveal {
-      opacity: 0;
-      transform: translateY(28px);
-      transition: opacity .6s ease, transform .6s ease;
-    }
-
-    .reveal.visible {
-      opacity: 1;
-      transform: translateY(0);
-    }
-
-    /* ── HAMBURGER (mobile) ── */
-    .hamburger {
-      display: none;
-      flex-direction: column;
-      gap: 5px;
-      cursor: pointer;
-      padding: 4px;
-    }
-
-    .hamburger span {
-      display: block;
-      width: 22px; height: 2px;
-      background: var(--txt);
-      border-radius: 2px;
-      transition: .3s;
-    }
+    /* ── SCROLL REVEAL ── */
+    .reveal { opacity: 0; transform: translateY(28px); transition: opacity 0.6s ease, transform 0.6s ease; }
+    .reveal.visible { opacity: 1; transform: none; }
 
     /* ── RESPONSIVE ── */
-    @media (max-width: 900px) {
-      .nav-links { display: none; }
-      .hamburger { display: flex; }
-      #about .about-grid { grid-template-columns: 1fr; gap: 36px; }
-      .contact-wrap { grid-template-columns: 1fr; gap: 36px; }
-      .form-row { grid-template-columns: 1fr; }
-      footer { flex-direction: column; text-align: center; }
+    @media (max-width: 1000px) {
+      .about-grid { grid-template-columns: 1fr; gap: 48px; }
+      .about-photo-col { flex-direction: row; flex-wrap: wrap; align-items: flex-start; }
+      .photo-frame { width: 200px; height: 200px; }
     }
-
+    @media (max-width: 900px) {
+      .hero { grid-template-columns: 1fr; padding-top: 100px; }
+      .dashboard-mock { display: none; }
+      .services-grid { grid-template-columns: 1fr 1fr; }
+      .process-steps { grid-template-columns: 1fr 1fr; gap: 32px; }
+      .process-steps::before { display: none; }
+      .industries-grid { grid-template-columns: 1fr; }
+      .form-row { grid-template-columns: 1fr; }
+      .nav-links { display: none; }
+    }
     @media (max-width: 600px) {
-      section { padding: 72px 5vw; }
-      .hero-stats { gap: 24px; }
+      .services-grid { grid-template-columns: 1fr; }
+      .contact-form { padding: 24px 20px; }
+      .testimonial-block { padding: 36px 28px; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .reveal, .db-kpi, .btn-primary, .service-card, .photo-frame::before { transition: none; animation: none; }
     }
   </style>
 </head>
 <body>
 
-<!-- NAV -->
+<!-- ── NAV ── -->
 <nav>
-  <a class="nav-logo" href="#hero">ZC.</a>
+  <div class="nav-logo">zoren<span>.</span>dev</div>
   <ul class="nav-links">
     <li><a href="#about">About</a></li>
     <li><a href="#services">Services</a></li>
-    <li><a href="#stack">Stack</a></li>
-    <li><a href="#portfolio">Portfolio</a></li>
-    <li><a href="#certifications">Certifications</a></li>
-    <li><a href="#testimonials">Testimonials</a></li>
-    <li><a href="#contact">Contact</a></li>
+    <li><a href="#process">Process</a></li>
+    <li><a href="#industries">Industries</a></li>
+    <li><a href="#contact" class="nav-cta">Hire Me</a></li>
   </ul>
-  <div class="hamburger" onclick="toggleMenu()">
-    <span></span><span></span><span></span>
-  </div>
 </nav>
 
-<!-- HERO -->
-<section id="hero">
-  <div class="hero-eyebrow">Available for Freelance Projects</div>
-  <h1>Zoren<br /><span class="accent">Cordon</span></h1>
-  <p class="hero-tagline">Tableau Developer &amp; BI Consultant helping businesses transform marketing and campaign data into clear, actionable insights.</p>
-  <div class="hero-cta">
-    <a href="#contact" class="btn-primary">
-      <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
-      Work With Me
-    </a>
-    <a href="https://www.linkedin.com/in/rozauro-cordon-082a2314a/" target="_blank" class="btn-secondary">
-      <svg width="16" height="16" fill="currentColor" viewBox="0 0 24 24"><path d="M16 8a6 6 0 016 6v7h-4v-7a2 2 0 00-2-2 2 2 0 00-2 2v7h-4v-7a6 6 0 016-6zM2 9h4v12H2z"/><circle cx="4" cy="4" r="2"/></svg>
-      LinkedIn Profile
-    </a>
+<!-- ── HERO ── -->
+<section class="hero" id="home">
+  <div class="hero-content">
+    <div class="hero-eyebrow">Freelance Tableau Developer · BI Consultant</div>
+    <h1 class="hero-headline">
+      Turn your data into<br /><em>decisions that move</em> the business
+    </h1>
+    <p class="hero-sub">
+      I build Tableau dashboards and data pipelines that give marketing teams, analysts, and executives the clarity to act fast — not just reports that look good in a meeting.
+    </p>
+    <div class="hero-actions">
+      <a href="#contact" class="btn-primary">Start a Project</a>
+      <a href="#services" class="btn-ghost">See What I Do</a>
+    </div>
+    <div class="hero-trust">
+      <div class="trust-badge">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M9 12l2 2 4-4"/></svg>
+        Tableau Certified Designer
+      </div>
+      <div class="trust-sep"></div>
+      <div class="trust-badge">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M9 12l2 2 4-4"/></svg>
+        Tableau Certified Analyst
+      </div>
+      <div class="trust-sep"></div>
+      <div class="trust-badge">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
+        8+ Years Experience
+      </div>
+    </div>
   </div>
-  <div class="hero-stats">
-    <div>
-      <div class="stat-num">8+</div>
-      <div class="stat-label">Years of Experience</div>
+
+  <div class="dashboard-mock reveal">
+    <div class="db-titlebar">
+      <div class="db-dot" style="background:#F87171"></div>
+      <div class="db-dot" style="background:var(--amber)"></div>
+      <div class="db-dot" style="background:#4ADE80"></div>
+      <span class="db-title">Campaign Performance · Live</span>
     </div>
-    <div>
-      <div class="stat-num">3</div>
-      <div class="stat-label">Ad Platforms Supported</div>
+    <div class="db-kpi-row">
+      <div class="db-kpi">
+        <div class="db-kpi-label">Total Spend</div>
+        <div class="db-kpi-value">$48.2K</div>
+        <div class="db-kpi-delta delta-up">▲ 12.4% vs LY</div>
+      </div>
+      <div class="db-kpi">
+        <div class="db-kpi-label">Approvals</div>
+        <div class="db-kpi-value">1,847</div>
+        <div class="db-kpi-delta delta-up">▲ 8.1% vs LY</div>
+      </div>
+      <div class="db-kpi">
+        <div class="db-kpi-label">CPA</div>
+        <div class="db-kpi-value">$26.09</div>
+        <div class="db-kpi-delta delta-down">▼ 3.7% vs LY</div>
+      </div>
     </div>
-    <div>
-      <div class="stat-num">2</div>
-      <div class="stat-label">Tableau Certifications</div>
+    <div class="db-chart-area">
+      <div class="db-chart-label">7-Day Approval Trend</div>
+      <svg class="sparkline-svg" viewBox="0 0 320 60" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <linearGradient id="sg" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="#00D4C8" stop-opacity="0.3"/>
+            <stop offset="100%" stop-color="#00D4C8" stop-opacity="0"/>
+          </linearGradient>
+        </defs>
+        <path d="M0,48 L46,42 L92,38 L138,30 L184,34 L230,22 L276,16 L320,10" fill="none" stroke="#00D4C8" stroke-width="2" stroke-linecap="round"/>
+        <path d="M0,48 L46,42 L92,38 L138,30 L184,34 L230,22 L276,16 L320,10 L320,60 L0,60 Z" fill="url(#sg)"/>
+        <circle cx="320" cy="10" r="4" fill="#00D4C8"/>
+        <circle cx="320" cy="10" r="7" fill="none" stroke="#00D4C8" stroke-width="1.5" opacity="0.4">
+          <animate attributeName="r" values="5;10;5" dur="2s" repeatCount="indefinite"/>
+          <animate attributeName="opacity" values="0.5;0;0.5" dur="2s" repeatCount="indefinite"/>
+        </circle>
+      </svg>
     </div>
-    <div>
-      <div class="stat-num">∞</div>
-      <div class="stat-label">Dashboards Delivered</div>
+    <div class="db-kpi-row" style="grid-template-columns: 1fr 1fr; margin-bottom: 14px;">
+      <div class="db-kpi">
+        <div class="db-kpi-label">EOM Projection</div>
+        <div class="db-kpi-value" style="font-size:1.1rem">~9,200 app</div>
+        <div class="db-kpi-delta" style="color:var(--slate)">at L7D pace</div>
+      </div>
+      <div class="db-kpi">
+        <div class="db-kpi-label">Budget Utilization</div>
+        <div class="db-kpi-value" style="font-size:1.1rem">74.3%</div>
+        <div class="db-kpi-delta delta-up">On Track</div>
+      </div>
+    </div>
+    <div class="db-chart-label" style="margin-bottom:6px;">Campaign Signals</div>
+    <div class="db-signal-row">
+      <span class="db-signal sig-scale">↑ Scale — FB_US_CC_01</span>
+      <span class="db-signal sig-pause">⏸ Pause — GG_RT_CC_04</span>
+      <span class="db-signal sig-monitor">◎ Monitor — TT_CC_02</span>
     </div>
   </div>
 </section>
 
-<!-- ABOUT -->
+<!-- ── TRUST BAR ── -->
+<div class="trust-bar">
+  <span class="trust-item">Tableau Cloud</span>
+  <span class="trust-item">Google BigQuery</span>
+  <span class="trust-item">Facebook Ads</span>
+  <span class="trust-item">Google Ads</span>
+  <span class="trust-item">TikTok Ads</span>
+  <span class="trust-item">Tableau Prep</span>
+</div>
+
+<!-- ── ABOUT ── -->
 <section id="about">
-  <div class="section-label">Who I Am</div>
-  <h2 class="section-title">About <span>Me</span></h2>
   <div class="about-grid">
-    <div class="about-text reveal">
-      <p>I'm <strong>Zoren Cordon</strong>, a Tableau Developer and BI Consultant with <strong>8 years of experience</strong> building data solutions that help teams make smarter, faster decisions.</p>
-      <p>I specialize in marketing campaign analytics, dashboard development, and data source design — primarily using <strong>Tableau Cloud</strong> and <strong>Google BigQuery</strong>. I've supported media buyers and analysts across Facebook, Google, and TikTok campaign reporting.</p>
-      <p>I'm passionate about turning messy data into clean, governed, and meaningful visuals. Whether you need a one-time dashboard build or an ongoing BI partner, I bring <strong>structure, standards, and storytelling</strong> to every engagement.</p>
+    <!-- LEFT: Photo + Certs -->
+    <div class="about-photo-col reveal">
+      <div class="photo-frame">
+        <img src="data:image/jpeg;base64,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xnXHP7JscrA3cAjC/ebgdMBeyQt01NeyNilNx+OVKxwC+6gH23OHE03AyFh4hQhpveF1juXOGDAwUGD+CAF1vx+4mH4Md7d7XDshuKoTbtMpsdzklCHE84HUu3DhZUcOO5aj1FYOw8D4wcRZ3rTcbm/xDH0S4kPsDUFuG0+p0yo9M0GNuOZc7VCDeCVuJUUUYcZUXc3PcQBpVkHqVf3GdfF5lLWV1Fw1A8+CBfHWO2sRNSo6hA6+CsVi9QXdLsZyTdJBjXc0X1blZdwCH3qcl4jLcPzGg4twwd9wfoQSt46jHcsZuzQiQXuXvTwhXSIyCtxHDnvDgpah98b61OFw4VyxdiLCVElYLCDhJxHiVE1Kq42vrPvzEv6mkpI53AGXyuf2UZoPuVCL/aRpECt8x0Hu5eH1Lly8bwR4yqH4Y9kIDjX8GJuJHBwfSSvKU5V1KVzNZ5GK+VxY7JTKWu4hwS5wzWD5o8oUjEZKG36mxLIcsNoEq1v6h9DVRLDeVQeYa1EWeofdw5J/j4I8xaneCo4KpYem5t37J5kaVhwxjjqwM9cu4VTnLNPiamCG4FLLyFUlTdgcN81hwKkdsS+cM2IN17C4IuQRWB0jVHlhDg/cdHiKvEisesnCoE4lTXFfjyVOHrt8yx4E/wBRIxwm445zFE4885tqGwFalN6lxQS8iYaIYBUr4Lly5cSFQllQRf6aO4zrs5ekuZe1VuWi+dzbTCDtP2XAC57CfpGNFPMf4eWJbCGNCKN71NLF3pQjwE5nEecLhn//2gAMAwEAAgADAAAAENnl1y5ox18z9wX2mprkvtwz3027+x110pu3x+0zwz5733k4456hx4By51yw8018vk6v5+27555qyU+c52BFr6D5+Sfy61zuhq2yz85671kovHQ16eHhMNxyb9111w/hom142y/68IqDz7solfuC3y514112+w+pqqiik517Q84gskeojKkf+394+y74xovkllmvjD4yDDBrMJyUiCw57586505vlogqmnrgFHsAMNOb5iraphumggjz9zmlovnqllvKcrFLl4JOzwSyqgnvri0+5quhppqtpCChWK/uogE+MoGIvqipuq5zkpnnlmhFNsKMPKD91eBpidoHojtqqqirqvqilvrHmcKn1nMycgrK1/NkllsijuviokqkqnDPjLzaauV45x6V4elnsiqn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" alt="Zoren Cordon — Tableau Developer" />
+      </div>
+      <div style="width:100%">
+        <div class="photo-name">Zoren Cordon</div>
+        <div class="photo-title">Tableau Developer & BI Consultant</div>
+      </div>
+      <div class="cert-badges">
+        <div class="cert-badge">
+          <div class="cert-icon">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#00D4C8" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M9 12l2 2 4-4"/></svg>
+          </div>
+          <div>
+            <div class="cert-text">Tableau Certified Designer</div>
+            <div class="cert-sub">Salesforce / Tableau</div>
+          </div>
+        </div>
+        <div class="cert-badge">
+          <div class="cert-icon">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#00D4C8" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M9 12l2 2 4-4"/></svg>
+          </div>
+          <div>
+            <div class="cert-text">Tableau Certified Analyst</div>
+            <div class="cert-sub">Salesforce / Tableau</div>
+          </div>
+        </div>
+      </div>
     </div>
-    <div class="about-highlights reveal">
-      <div class="highlight-card">
-        <div class="highlight-icon">📊</div>
-        <div>
-          <h4>Marketing Campaign Analytics</h4>
-          <p>Deep expertise across Facebook, Google, and TikTok ad platforms — from raw data to exec-ready dashboards.</p>
+
+    <!-- RIGHT: Bio + Stats + Stack -->
+    <div class="reveal">
+      <div class="section-eyebrow">About Me</div>
+      <h2 class="section-heading">BI practitioner who speaks both data and business</h2>
+      <p class="body-font" style="color: var(--slate-light); line-height: 1.75; margin-bottom: 14px; font-family: 'Inter', sans-serif;">
+        I'm Zoren Cordon, a Tableau Developer and BI Consultant based in the Philippines with 8 years of experience building analytics solutions for performance marketing teams.
+      </p>
+      <p class="body-font" style="color: var(--slate-light); line-height: 1.75; margin-bottom: 14px; font-family: 'Inter', sans-serif;">
+        My specialty is translating messy campaign data — Facebook, Google, TikTok — into prescriptive dashboards that don't just show what happened, but tell teams exactly what to do next.
+      </p>
+      <p class="body-font" style="color: var(--slate-light); line-height: 1.75; font-family: 'Inter', sans-serif;">
+        I've worked inside a BI Center of Excellence supporting media buyers and performance analysts in credit card affiliate marketing, building signal detection systems, EOM scenario planners, and executive reporting suites on Tableau Cloud backed by Google BigQuery.
+      </p>
+
+      <div class="about-about-stats">
+        <div class="stat-card">
+          <div class="stat-num">8<span>+</span></div>
+          <div class="stat-label">Years in Tableau & BI</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-num">2</div>
+          <div class="stat-label">Tableau Certifications</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-num">50<span>+</span></div>
+          <div class="stat-label">Dashboards Delivered</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-num">3</div>
+          <div class="stat-label">Ad Platforms Mastered</div>
         </div>
       </div>
-      <div class="highlight-card">
-        <div class="highlight-icon">🏛️</div>
-        <div>
-          <h4>BI Governance & Standardization</h4>
-          <p>I build structured, reusable data sources and enforce standards that scale with your organization.</p>
-        </div>
-      </div>
-      <div class="highlight-card">
-        <div class="highlight-icon">🎓</div>
-        <div>
-          <h4>Certified Tableau Professional</h4>
-          <p>Tableau Designer and Analyst certified, with hands-on Tableau Cloud and BigQuery expertise.</p>
-        </div>
-      </div>
-      <div class="highlight-card">
-        <div class="highlight-icon">🤝</div>
-        <div>
-          <h4>Collaborative BI Partner</h4>
-          <p>I work closely with analysts, media buyers, and stakeholders to align data to real business decisions.</p>
-        </div>
+
+      <div class="stack-pills">
+        <span class="pill">Tableau Cloud</span>
+        <span class="pill">Tableau Desktop</span>
+        <span class="pill">Tableau Prep</span>
+        <span class="pill">Google BigQuery</span>
+        <span class="pill">LOD Expressions</span>
+        <span class="pill">Tableau REST API</span>
+        <span class="pill">Python</span>
+        <span class="pill">SQL</span>
+        <span class="pill">TabPy</span>
+        <span class="pill">GitHub Actions</span>
       </div>
     </div>
   </div>
 </section>
 
-<!-- SERVICES -->
+<!-- ── SERVICES ── -->
 <section id="services">
-  <div class="section-label">What I Offer</div>
-  <h2 class="section-title">My <span>Services</span></h2>
+  <div class="reveal">
+    <div class="section-eyebrow">What I Do</div>
+    <h2 class="section-heading">End-to-end Tableau & BI services</h2>
+    <p class="section-sub">From raw data to polished, decision-ready dashboards — I handle the full stack so your team can focus on what the numbers mean, not how to get them.</p>
+  </div>
   <div class="services-grid">
     <div class="service-card reveal">
-      <span class="service-icon">📈</span>
-      <h3>Custom Tableau Dashboard Development</h3>
-      <p>Tailored, interactive dashboards built for your audience — from media buyers to C-suite executives.</p>
+      <div class="service-icon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#00D4C8" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg></div>
+      <div class="service-title">Custom Dashboard Design</div>
+      <div class="service-desc">Pixel-perfect Tableau dashboards built around how your team actually works — with the right KPIs, the right layout, and zero clutter. Optimized for Tableau Cloud and desktop.</div>
+      <div class="service-tag">Tableau · LOD · Design</div>
     </div>
     <div class="service-card reveal">
-      <span class="service-icon">☁️</span>
-      <h3>Tableau Cloud Setup & Data Source Management</h3>
-      <p>End-to-end Tableau Cloud setup, published data sources, permissions, and scheduled refreshes.</p>
+      <div class="service-icon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#00D4C8" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg></div>
+      <div class="service-title">Prescriptive Analytics</div>
+      <div class="service-desc">Go beyond descriptive charts. I build signal detection, scale/pause flags, urgency scoring, and EOM scenario planners that tell teams what to do — not just what happened.</div>
+      <div class="service-tag">Signals · Forecasting · Actions</div>
     </div>
     <div class="service-card reveal">
-      <span class="service-icon">🔍</span>
-      <h3>BigQuery SQL Development & Data Modeling</h3>
-      <p>Clean, optimized SQL queries and star schema data models that power fast, reliable analytics.</p>
+      <div class="service-icon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#00D4C8" stroke-width="2"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg></div>
+      <div class="service-title">Data Pipeline & Prep</div>
+      <div class="service-desc">Clean, structured data pipelines from BigQuery, MySQL, or Google Sheets to Tableau Cloud. Automated flows with Tableau Prep, Python, and scheduled refreshes.</div>
+      <div class="service-tag">BigQuery · Tableau Prep · Python</div>
     </div>
     <div class="service-card reveal">
-      <span class="service-icon">📣</span>
-      <h3>Marketing & Campaign Analytics Reporting</h3>
-      <p>Performance reporting for Facebook, Google, and TikTok campaigns — KPIs, pacing, and deep-dive analysis.</p>
+      <div class="service-icon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#00D4C8" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></div>
+      <div class="service-title">Team Training & Enablement</div>
+      <div class="service-desc">Structured Tableau training for BI teams — from beginner chart fluency to advanced LOD expressions, performance optimization, and dashboard best practices.</div>
+      <div class="service-tag">Training · Workshops · Enablement</div>
     </div>
     <div class="service-card reveal">
-      <span class="service-icon">🏗️</span>
-      <h3>BI Standardization & Data Governance</h3>
-      <p>Establishing naming conventions, metric definitions, and data source standards across your BI stack.</p>
+      <div class="service-icon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#00D4C8" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg></div>
+      <div class="service-title">Dashboard Audit & Optimization</div>
+      <div class="service-desc">Slow, confusing, or misleading dashboards fixed. I audit existing Tableau workbooks for performance, usability, and analytical integrity — then rebuild what needs it.</div>
+      <div class="service-tag">Audit · Performance · Redesign</div>
     </div>
     <div class="service-card reveal">
-      <span class="service-icon">🎓</span>
-      <h3>Tableau Training & Team Enablement</h3>
-      <p>Hands-on training sessions for analysts and business users to get the most out of Tableau.</p>
-    </div>
-    <div class="service-card reveal">
-      <span class="service-icon">⭐</span>
-      <h3>Star Schema Design & Data Architecture</h3>
-      <p>Structured data source architecture that ensures scalability, accuracy, and report performance.</p>
-    </div>
-    <div class="service-card reveal">
-      <span class="service-icon">💼</span>
-      <h3>Freelance BI Consulting</h3>
-      <p>Flexible ad-hoc and ongoing BI consulting engagements — from scoping to delivery and beyond.</p>
+      <div class="service-icon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#00D4C8" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg></div>
+      <div class="service-title">Marketing Analytics</div>
+      <div class="service-desc">Specialized reporting for paid media campaigns — Facebook, Google, TikTok. Pacing tables, CPA tracking, platform comparisons, and executive rollups purpose-built for performance teams.</div>
+      <div class="service-tag">Paid Media · CPA · Attribution</div>
     </div>
   </div>
 </section>
 
-<!-- TECH STACK -->
-<section id="stack">
-  <div class="section-label">Tools & Technologies</div>
-  <h2 class="section-title">My Tech <span>Stack</span></h2>
-  <div class="stack-grid">
-    <div class="stack-item reveal">
-      <span class="stack-icon">📊</span>
-      <span>Tableau Cloud</span>
-    </div>
-    <div class="stack-item reveal">
-      <span class="stack-icon">🔷</span>
-      <span>Google BigQuery</span>
-    </div>
-    <div class="stack-item reveal">
-      <span class="stack-icon">🗄️</span>
-      <span>SQL</span>
-    </div>
-    <div class="stack-item reveal">
-      <span class="stack-icon">📘</span>
-      <span>Facebook Ads</span>
-    </div>
-    <div class="stack-item reveal">
-      <span class="stack-icon">🔴</span>
-      <span>Google Ads</span>
-    </div>
-    <div class="stack-item reveal">
-      <span class="stack-icon">🎵</span>
-      <span>TikTok Ads</span>
-    </div>
-    <div class="stack-item reveal">
-      <span class="stack-icon">⭐</span>
-      <span>Star Schema</span>
-    </div>
-    <div class="stack-item reveal">
-      <span class="stack-icon">🤖</span>
-      <span>Gemini / AI</span>
-    </div>
+<!-- ── PROCESS ── -->
+<section id="process">
+  <div class="reveal" style="text-align:center; margin-bottom: 60px;">
+    <div class="section-eyebrow" style="justify-content:center; display:flex;">How I Work</div>
+    <h2 class="section-heading" style="max-width:100%; text-align:center; margin:14px auto 0;">A clear process, every engagement</h2>
+  </div>
+  <div class="process-steps">
+    <div class="process-step reveal"><div class="step-num">1</div><div class="step-title">Discovery</div><div class="step-desc">I start by understanding your data sources, team workflows, and the decisions your dashboards need to support.</div></div>
+    <div class="process-step reveal"><div class="step-num">2</div><div class="step-title">Blueprint</div><div class="step-desc">A layout and logic blueprint before any Tableau build — so you know exactly what you're getting before I write a single LOD.</div></div>
+    <div class="process-step reveal"><div class="step-num">3</div><div class="step-title">Build & Review</div><div class="step-desc">Iterative builds with review checkpoints. You see progress early and can course-correct before the final polish pass.</div></div>
+    <div class="process-step reveal"><div class="step-num">4</div><div class="step-title">Handoff & Support</div><div class="step-desc">Clean handoff with documentation. I stay available for questions, iterations, and ongoing retainer support if needed.</div></div>
   </div>
 </section>
 
-<!-- PORTFOLIO -->
-<section id="portfolio">
-  <div class="section-label">Featured Work</div>
-  <h2 class="section-title">Portfolio &amp; <span>Sample Work</span></h2>
-  <div class="portfolio-grid">
-    <div class="portfolio-card reveal">
-      <div class="portfolio-thumb">💰</div>
-      <div class="portfolio-body">
-        <div class="portfolio-tag">Finance · BI Dashboard</div>
-        <h3>Revenue Management Dashboard</h3>
-        <p>An interactive finance and pacing dashboard providing real-time revenue tracking, end-of-month scenario projections (status quo, scale up/down), and key performance indicators for data-driven budget decisions.</p>
-      </div>
-    </div>
-    <div class="portfolio-card reveal">
-      <div class="portfolio-thumb">📣</div>
-      <div class="portfolio-body">
-        <div class="portfolio-tag">Marketing · Campaign Analytics</div>
-        <h3>Native PPC &amp; Newsletters Performance Dashboard</h3>
-        <p>A comprehensive campaign performance dashboard tracking native PPC and newsletter channel KPIs — including CTR, CPC, conversion rates, and spend pacing — designed for media buyers and campaign analysts.</p>
-      </div>
-    </div>
+<!-- ── INDUSTRIES ── -->
+<section id="industries">
+  <div class="reveal">
+    <div class="section-eyebrow">Industries</div>
+    <h2 class="section-heading">Deep experience where it matters</h2>
+    <p class="section-sub">Most of my work lives at the intersection of performance marketing and data — but the skills transfer wherever decisions need to be faster and sharper.</p>
+  </div>
+  <div class="industries-grid reveal">
+    <div class="industry-card"><div class="ind-icon">📈</div><div><div class="ind-title">Performance Marketing & Paid Media</div><div class="ind-desc">8 years building dashboards for Facebook, Google, and TikTok campaign teams. CPA tracking, budget pacing, creative performance, scale/pause signals, and EOM projections.</div></div></div>
+    <div class="industry-card"><div class="ind-icon">💳</div><div><div class="ind-title">Credit Card & Financial Services</div><div class="ind-desc">Affiliate marketing analytics for financial products — approval funnels, lead quality scoring, cost-per-completed-application (CPCA), and fraud signal detection.</div></div></div>
+    <div class="industry-card"><div class="ind-icon">🏨</div><div><div class="ind-title">Hospitality & Revenue Management</div><div class="ind-desc">OTB pacing, reservation source consolidation, demand pace trend analysis, and Tableau reporting for hotel groups.</div></div></div>
+    <div class="industry-card"><div class="ind-icon">🏢</div><div><div class="ind-title">Enterprise BI & Data Strategy</div><div class="ind-desc">BI CoE frameworks, data governance standards, date calculation libraries, Tableau Cloud site management, and team-level analytics enablement programs.</div></div></div>
   </div>
 </section>
 
-<!-- CERTIFICATIONS -->
-<section id="certifications">
-  <div class="section-label">Credentials</div>
-  <h2 class="section-title">My <span>Certifications</span></h2>
-  <div class="certs-grid">
-    <div class="cert-card reveal">
-      <div class="cert-badge">🏅</div>
-      <div>
-        <h4>Tableau Certified Designer</h4>
-        <p>Tableau / Salesforce</p>
-      </div>
-    </div>
-    <div class="cert-card reveal">
-      <div class="cert-badge">🎖️</div>
-      <div>
-        <h4>Tableau Certified Analyst</h4>
-        <p>Tableau / Salesforce</p>
-      </div>
-    </div>
-    <div class="cert-card cert-placeholder reveal">
-      <div class="cert-badge">➕</div>
-      <div>
-        <h4>Certification Placeholder</h4>
-        <p>Add your next credential here</p>
-      </div>
-    </div>
-    <div class="cert-card cert-placeholder reveal">
-      <div class="cert-badge">➕</div>
-      <div>
-        <h4>Certification Placeholder</h4>
-        <p>Add your next credential here</p>
-      </div>
-    </div>
+<!-- ── TESTIMONIAL ── -->
+<section>
+  <div class="testimonial-block reveal">
+    <p class="testimonial-text">"Zoren doesn't just build dashboards — he builds answers. The campaign signal system he designed cut our daily reporting time in half and gave our media buyers a clear playbook every morning without opening a spreadsheet."</p>
+    <div class="testimonial-author">Performance Marketing Lead</div>
+    <div class="testimonial-role">Credit Card Affiliate Marketing · Philippines</div>
   </div>
 </section>
 
-<!-- TESTIMONIALS -->
-<section id="testimonials">
-  <div class="section-label">What Clients Say</div>
-  <h2 class="section-title">Client <span>Testimonials</span></h2>
-  <div class="testimonials-grid">
-    <div class="testimonial-card reveal">
-      <div class="quote-icon">"</div>
-      <p class="testimonial-placeholder">Testimonial coming soon. Your clients' feedback will appear here.</p>
-      <div class="testimonial-author">
-        <div class="author-avatar">👤</div>
-        <div>
-          <div class="author-name">Client Name</div>
-          <div class="author-title">Title, Company</div>
-        </div>
-      </div>
-    </div>
-    <div class="testimonial-card reveal">
-      <div class="quote-icon">"</div>
-      <p class="testimonial-placeholder">Testimonial coming soon. Your clients' feedback will appear here.</p>
-      <div class="testimonial-author">
-        <div class="author-avatar">👤</div>
-        <div>
-          <div class="author-name">Client Name</div>
-          <div class="author-title">Title, Company</div>
-        </div>
-      </div>
-    </div>
-    <div class="testimonial-card reveal">
-      <div class="quote-icon">"</div>
-      <p class="testimonial-placeholder">Testimonial coming soon. Your clients' feedback will appear here.</p>
-      <div class="testimonial-author">
-        <div class="author-avatar">👤</div>
-        <div>
-          <div class="author-name">Client Name</div>
-          <div class="author-title">Title, Company</div>
-        </div>
-      </div>
-    </div>
-  </div>
-</section>
-
-<!-- CONTACT -->
+<!-- ── CONTACT ── -->
 <section id="contact">
-  <div class="section-label">Get In Touch</div>
-  <h2 class="section-title">Let's Work <span>Together</span></h2>
-  <div class="contact-wrap">
-    <div class="contact-info reveal">
-      <h3>Have a project in mind?</h3>
-      <p>I'm open to freelance engagements, consulting projects, and long-term partnerships. Fill out the form and I'll get back to you within 1–2 business days.</p>
-      <div class="contact-detail">
-        <div class="contact-detail-icon">✉️</div>
-        <a href="mailto:zoren.tableaudev@gmail.com">zoren.tableaudev@gmail.com</a>
+  <div class="cta-block reveal">
+    <div class="section-eyebrow" style="justify-content:center;display:flex;">Let's Work Together</div>
+    <h2 class="section-heading">Ready to make your data actually useful?</h2>
+    <p class="section-sub">Tell me what you're working with and what you need. I'll reply within 24 hours with a clear proposal — no jargon, no vague estimates.</p>
+  </div>
+  <div class="contact-form reveal">
+    <form action="https://formspree.io/f/mrejakzy" method="POST">
+      <div class="form-row">
+        <div class="form-group"><label class="form-label" for="name">Your Name</label><input class="form-input" type="text" id="name" name="name" placeholder="Juan dela Cruz" required /></div>
+        <div class="form-group"><label class="form-label" for="email">Email Address</label><input class="form-input" type="email" id="email" name="email" placeholder="juan@company.com" required /></div>
       </div>
-      <div class="contact-detail">
-        <div class="contact-detail-icon">💼</div>
-        <a href="https://www.linkedin.com/in/rozauro-cordon-082a2314a/" target="_blank">LinkedIn Profile</a>
+      <div class="form-group">
+        <label class="form-label" for="service">What do you need?</label>
+        <select class="form-select" id="service" name="service">
+          <option value="">Select a service...</option>
+          <option>Custom Dashboard Design</option>
+          <option>Prescriptive Analytics / Signal Detection</option>
+          <option>Data Pipeline & Tableau Prep</option>
+          <option>Dashboard Audit & Optimization</option>
+          <option>Marketing Analytics (Paid Media)</option>
+          <option>Team Training & Enablement</option>
+          <option>Other / Not Sure Yet</option>
+        </select>
       </div>
-      <div class="contact-detail">
-        <div class="contact-detail-icon">📍</div>
-        <span>San Pablo, Laguna, Philippines · Remote Available</span>
-      </div>
-    </div>
-    <div class="contact-form reveal">
-      <form action="https://formspree.io/f/YOUR_FORM_ID" method="POST">
-        <div class="form-row">
-          <div class="form-group">
-            <label for="fname">First Name</label>
-            <input type="text" id="fname" name="first_name" placeholder="Juan" required />
-          </div>
-          <div class="form-group">
-            <label for="lname">Last Name</label>
-            <input type="text" id="lname" name="last_name" placeholder="Dela Cruz" required />
-          </div>
-        </div>
-        <div class="form-group">
-          <label for="email">Email Address</label>
-          <input type="email" id="email" name="email" placeholder="you@company.com" required />
-        </div>
-        <div class="form-group">
-          <label for="service">Service Interested In</label>
-          <select id="service" name="service">
-            <option value="" disabled selected>Select a service...</option>
-            <option>Custom Tableau Dashboard Development</option>
-            <option>Tableau Cloud Setup & Data Source Management</option>
-            <option>BigQuery SQL Development & Data Modeling</option>
-            <option>Marketing & Campaign Analytics Reporting</option>
-            <option>BI Standardization & Data Governance</option>
-            <option>Tableau Training & Team Enablement</option>
-            <option>Star Schema Design & Data Architecture</option>
-            <option>Freelance BI Consulting</option>
-            <option>Other / Not Sure Yet</option>
-          </select>
-        </div>
-        <div class="form-group">
-          <label for="message">Tell Me About Your Project</label>
-          <textarea id="message" name="message" placeholder="Briefly describe what you need, your timeline, and any relevant context..."></textarea>
-        </div>
-        <button type="submit" class="form-submit">Send Inquiry →</button>
-      </form>
-    </div>
+      <div class="form-group"><label class="form-label" for="message">Tell me about your project</label><textarea class="form-textarea" id="message" name="message" placeholder="What data do you have, what decisions do you need to make from it, and what's the timeline?" required></textarea></div>
+      <button type="submit" class="form-submit">Send Inquiry →</button>
+    </form>
+  </div>
+  <div class="contact-alternatives">
+    <a href="mailto:zoren.tableaudev@gmail.com" class="contact-alt-item"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>zoren.tableaudev@gmail.com</a>
+    <a href="https://zorentableaudev.github.io" target="_blank" class="contact-alt-item"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 9 18.13V22"/></svg>zorentableaudev.github.io</a>
   </div>
 </section>
 
-<!-- FOOTER -->
+<!-- ── FOOTER ── -->
 <footer>
-  <div class="footer-logo">Zoren Cordon</div>
-  <div class="footer-copy">© 2026 Zoren Cordon · Tableau Developer & BI Consultant</div>
-  <div class="footer-links">
-    <a href="mailto:zoren.tableaudev@gmail.com">Email</a>
-    <a href="https://www.linkedin.com/in/rozauro-cordon-082a2314a/" target="_blank">LinkedIn</a>
-    <a href="#contact">Hire Me</a>
-  </div>
+  <div class="footer-brand">zoren<span>.</span>dev — Rozauro Cordon</div>
+  <div class="footer-copy">© 2026 · San Pablo, Calabarzon, Philippines · Available for remote & local projects</div>
 </footer>
 
 <script>
-  // Scroll reveal
   const reveals = document.querySelectorAll('.reveal');
-  const observer = new IntersectionObserver(entries => {
+  const observer = new IntersectionObserver((entries) => {
     entries.forEach((e, i) => {
       if (e.isIntersecting) {
-        setTimeout(() => e.target.classList.add('visible'), i * 60);
+        setTimeout(() => e.target.classList.add('visible'), i * 80);
         observer.unobserve(e.target);
       }
     });
   }, { threshold: 0.1 });
   reveals.forEach(el => observer.observe(el));
-
-  // Mobile menu toggle
-  function toggleMenu() {
-    const nav = document.querySelector('.nav-links');
-    if (nav.style.display === 'flex') {
-      nav.style.display = 'none';
-    } else {
-      Object.assign(nav.style, {
-        display: 'flex',
-        flexDirection: 'column',
-        position: 'absolute',
-        top: '64px', left: 0, right: 0,
-        background: 'rgba(9,11,16,.97)',
-        padding: '20px 6vw 28px',
-        borderBottom: '1px solid rgba(255,255,255,.06)',
-        gap: '18px'
-      });
-    }
-  }
-
-  // Nav active highlight on scroll
-  const sections = document.querySelectorAll('section[id]');
-  window.addEventListener('scroll', () => {
-    let current = '';
-    sections.forEach(s => {
-      if (window.scrollY >= s.offsetTop - 100) current = s.id;
-    });
-    document.querySelectorAll('.nav-links a').forEach(a => {
-      a.style.color = a.getAttribute('href') === `#${current}` ? 'var(--teal)' : '';
-    });
-  });
+  document.querySelector('.dashboard-mock').classList.add('visible');
 </script>
 </body>
 </html>
