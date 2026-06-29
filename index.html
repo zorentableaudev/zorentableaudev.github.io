@@ -185,13 +185,17 @@
 
     /* ── DASHBOARD MOCKUP ── */
     .dashboard-mock {
+      display: block;
       background: var(--navy-mid);
       border: 1px solid rgba(0, 212, 200, 0.2);
       border-radius: 12px;
       padding: 24px;
       box-shadow: 0 24px 80px rgba(0, 0, 0, 0.5), 0 0 40px rgba(0, 212, 200, 0.06);
       position: relative;
+      text-decoration: none;
+      transition: border-color 0.25s, transform 0.2s;
     }
+    .dashboard-mock:hover { border-color: rgba(0, 212, 200, 0.4); transform: translateY(-2px); }
     .db-titlebar {
       display: flex; align-items: center; gap: 8px;
       margin-bottom: 20px; padding-bottom: 16px;
@@ -207,67 +211,27 @@
       text-transform: uppercase;
       margin-left: 6px;
     }
-    .db-kpi-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 16px; }
-    .db-kpi {
-      background: var(--navy-light);
+    .db-shot-wrap {
+      position: relative;
       border-radius: 8px;
+      overflow: hidden;
+      border: 1px solid rgba(255,255,255,0.06);
+    }
+    .db-shot-wrap img { width: 100%; display: block; }
+    .db-shot-overlay {
+      position: absolute; inset: 0;
+      background: linear-gradient(180deg, transparent 55%, rgba(11,20,38,0.94) 100%);
+      display: flex; align-items: flex-end; justify-content: flex-end;
       padding: 14px 16px;
-      border: 1px solid rgba(255,255,255,0.05);
+      opacity: 0; transition: opacity 0.25s;
     }
-    .db-kpi-label {
+    .dashboard-mock:hover .db-shot-overlay { opacity: 1; }
+    .db-shot-link {
       font-family: 'Bahnschrift', 'DIN Alternate', sans-serif;
-      font-size: 0.65rem;
-      text-transform: uppercase;
-      letter-spacing: 0.1em;
-      color: var(--slate);
-      margin-bottom: 6px;
+      font-size: 0.7rem; font-weight: 700;
+      letter-spacing: 0.06em; text-transform: uppercase;
+      color: var(--teal);
     }
-    .db-kpi-value {
-      font-family: 'Bahnschrift', 'DIN Alternate', sans-serif;
-      font-size: 1.4rem;
-      font-weight: 700;
-      color: var(--white);
-    }
-    .db-kpi-delta { font-family: 'Inter', sans-serif; font-size: 0.7rem; font-weight: 500; margin-top: 4px; }
-    .delta-up { color: #4ADE80; }
-    .delta-down { color: #F87171; }
-
-    .db-chart-area {
-      background: var(--navy-light);
-      border-radius: 8px;
-      padding: 14px 16px;
-      border: 1px solid rgba(255,255,255,0.05);
-      margin-bottom: 14px;
-    }
-    .db-chart-label {
-      font-family: 'Bahnschrift', 'DIN Alternate', sans-serif;
-      font-size: 0.65rem;
-      text-transform: uppercase;
-      letter-spacing: 0.08em;
-      color: var(--slate);
-      margin-bottom: 12px;
-    }
-    .sparkline-svg { width: 100%; height: 60px; }
-
-    .db-signal-row { display: flex; gap: 8px; flex-wrap: wrap; }
-    .db-signal {
-      font-family: 'Bahnschrift', 'DIN Alternate', sans-serif;
-      font-size: 0.62rem;
-      font-weight: 600;
-      padding: 4px 10px;
-      border-radius: 20px;
-      letter-spacing: 0.06em;
-      text-transform: uppercase;
-    }
-    .sig-scale { background: rgba(74, 222, 128, 0.15); color: #4ADE80; border: 1px solid rgba(74,222,128,0.3); }
-    .sig-pause { background: rgba(248, 113, 113, 0.15); color: #F87171; border: 1px solid rgba(248,113,113,0.3); }
-    .sig-monitor { background: rgba(245, 166, 35, 0.15); color: var(--amber); border: 1px solid rgba(245,166,35,0.3); }
-
-    @keyframes kpiPulse {
-      0%, 100% { border-color: rgba(0, 212, 200, 0.08); }
-      50% { border-color: rgba(0, 212, 200, 0.45); box-shadow: 0 0 12px rgba(0,212,200,0.12); }
-    }
-    .db-kpi:first-child { animation: kpiPulse 3s ease-in-out infinite; }
 
     /* ── TRUST BAR ── */
     .trust-bar {
@@ -792,7 +756,7 @@
       .testimonial-block { padding: 36px 28px; }
     }
     @media (prefers-reduced-motion: reduce) {
-      .reveal, .db-kpi, .btn-primary, .service-card, .photo-frame::before { transition: none; animation: none; }
+      .reveal, .dashboard-mock, .btn-primary, .service-card, .photo-frame::before { transition: none; animation: none; }
     }
   </style>
 </head>
@@ -843,67 +807,18 @@
     </div>
   </div>
 
-  <div class="dashboard-mock reveal">
+  <a class="dashboard-mock reveal" href="https://public.tableau.com/app/profile/zoren.cordon/viz/TableauMasterclassWorkingwithContainers/SALESPERFORMANCEOVERVIEW" target="_blank" rel="noopener noreferrer">
     <div class="db-titlebar">
       <div class="db-dot" style="background:#F87171"></div>
       <div class="db-dot" style="background:var(--amber)"></div>
       <div class="db-dot" style="background:#4ADE80"></div>
-      <span class="db-title">Campaign Performance · Live</span>
+      <span class="db-title">Sales Performance Overview · Tableau Public</span>
     </div>
-    <div class="db-kpi-row">
-      <div class="db-kpi">
-        <div class="db-kpi-label">Total Spend</div>
-        <div class="db-kpi-value">$48.2K</div>
-        <div class="db-kpi-delta delta-up">▲ 12.4% vs LY</div>
-      </div>
-      <div class="db-kpi">
-        <div class="db-kpi-label">Approvals</div>
-        <div class="db-kpi-value">1,847</div>
-        <div class="db-kpi-delta delta-up">▲ 8.1% vs LY</div>
-      </div>
-      <div class="db-kpi">
-        <div class="db-kpi-label">CPA</div>
-        <div class="db-kpi-value">$26.09</div>
-        <div class="db-kpi-delta delta-down">▼ 3.7% vs LY</div>
-      </div>
+    <div class="db-shot-wrap">
+      <img src="assets/dashboards/masterclass-containers.png" alt="Real Tableau Public dashboard: Sales Performance Overview" />
+      <div class="db-shot-overlay"><span class="db-shot-link">View Live On Tableau Public ↗</span></div>
     </div>
-    <div class="db-chart-area">
-      <div class="db-chart-label">7-Day Approval Trend</div>
-      <svg class="sparkline-svg" viewBox="0 0 320 60" xmlns="http://www.w3.org/2000/svg">
-        <defs>
-          <linearGradient id="sg" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stop-color="#00D4C8" stop-opacity="0.3"/>
-            <stop offset="100%" stop-color="#00D4C8" stop-opacity="0"/>
-          </linearGradient>
-        </defs>
-        <path d="M0,48 L46,42 L92,38 L138,30 L184,34 L230,22 L276,16 L320,10" fill="none" stroke="#00D4C8" stroke-width="2" stroke-linecap="round"/>
-        <path d="M0,48 L46,42 L92,38 L138,30 L184,34 L230,22 L276,16 L320,10 L320,60 L0,60 Z" fill="url(#sg)"/>
-        <circle cx="320" cy="10" r="4" fill="#00D4C8"/>
-        <circle cx="320" cy="10" r="7" fill="none" stroke="#00D4C8" stroke-width="1.5" opacity="0.4">
-          <animate attributeName="r" values="5;10;5" dur="2s" repeatCount="indefinite"/>
-          <animate attributeName="opacity" values="0.5;0;0.5" dur="2s" repeatCount="indefinite"/>
-        </circle>
-      </svg>
-    </div>
-    <div class="db-kpi-row" style="grid-template-columns: 1fr 1fr; margin-bottom: 14px;">
-      <div class="db-kpi">
-        <div class="db-kpi-label">EOM Projection</div>
-        <div class="db-kpi-value" style="font-size:1.1rem">~9,200 app</div>
-        <div class="db-kpi-delta" style="color:var(--slate)">at L7D pace</div>
-      </div>
-      <div class="db-kpi">
-        <div class="db-kpi-label">Budget Utilization</div>
-        <div class="db-kpi-value" style="font-size:1.1rem">74.3%</div>
-        <div class="db-kpi-delta delta-up">On Track</div>
-      </div>
-    </div>
-    <div class="db-chart-label" style="margin-bottom:6px;">Campaign Signals</div>
-    <div class="db-signal-row">
-      <span class="db-signal sig-scale">↑ Scale — FB_US_CC_01</span>
-      <span class="db-signal sig-pause">⏸ Pause — GG_RT_CC_04</span>
-      <span class="db-signal sig-monitor">◎ Monitor — TT_CC_02</span>
-    </div>
-  </div>
+  </a>
 </section>
 
 <!-- ── TRUST BAR ── -->
