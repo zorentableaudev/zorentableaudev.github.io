@@ -438,6 +438,81 @@
       color: var(--teal);
     }
 
+    /* ── PORTFOLIO ── */
+    .portfolio-group { margin-bottom: 52px; }
+    .portfolio-group:last-child { margin-bottom: 0; }
+    .portfolio-group-label {
+      font-family: 'Bahnschrift', 'DIN Alternate', sans-serif;
+      font-size: 0.72rem;
+      font-weight: 700;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--slate);
+      margin-bottom: 20px;
+      display: flex; align-items: center; gap: 14px;
+    }
+    .portfolio-group-label::after {
+      content: '';
+      flex: 1; height: 1px;
+      background: rgba(255,255,255,0.08);
+    }
+    .portfolio-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(270px, 1fr)); gap: 24px; }
+    .portfolio-card {
+      background: var(--navy-mid);
+      border: 1px solid rgba(255,255,255,0.07);
+      border-radius: 10px;
+      overflow: hidden;
+      text-decoration: none;
+      display: block;
+      transition: border-color 0.25s, transform 0.2s;
+    }
+    .portfolio-card:hover { border-color: rgba(0, 212, 200, 0.35); transform: translateY(-4px); }
+    .portfolio-thumb-wrap { position: relative; width: 100%; height: 170px; overflow: hidden; background: var(--navy-light); }
+    .portfolio-thumb-wrap img {
+      width: 100%; height: 100%;
+      object-fit: cover; object-position: top center;
+      display: block;
+      transition: transform 0.35s;
+    }
+    .portfolio-card:hover .portfolio-thumb-wrap img { transform: scale(1.05); }
+    .portfolio-overlay {
+      position: absolute; inset: 0;
+      background: linear-gradient(180deg, transparent 45%, rgba(11,20,38,0.94) 100%);
+      display: flex; align-items: flex-end; justify-content: flex-end;
+      padding: 12px 14px;
+      opacity: 0; transition: opacity 0.25s;
+    }
+    .portfolio-card:hover .portfolio-overlay { opacity: 1; }
+    .portfolio-view-link {
+      font-family: 'Bahnschrift', 'DIN Alternate', sans-serif;
+      font-size: 0.68rem; font-weight: 700;
+      letter-spacing: 0.06em; text-transform: uppercase;
+      color: var(--teal);
+      display: flex; align-items: center; gap: 5px;
+    }
+    .portfolio-views {
+      position: absolute; top: 10px; right: 10px;
+      background: rgba(11,20,38,0.78);
+      backdrop-filter: blur(4px);
+      color: var(--slate-light);
+      font-family: 'Inter', sans-serif;
+      font-size: 0.68rem; font-weight: 500;
+      padding: 4px 10px; border-radius: 20px;
+      display: flex; align-items: center; gap: 5px;
+    }
+    .portfolio-body { padding: 20px 22px 22px; }
+    .portfolio-title {
+      font-family: 'Bahnschrift', 'DIN Alternate', sans-serif;
+      font-weight: 700; font-size: 0.96rem;
+      color: var(--white); margin-bottom: 9px;
+      letter-spacing: 0.01em; line-height: 1.32;
+    }
+    .portfolio-desc {
+      font-family: 'Inter', sans-serif;
+      font-size: 0.825rem; color: var(--slate-light);
+      line-height: 1.6;
+    }
+
     /* ── SERVICES ── */
     #services { background: var(--navy-mid); }
     .services-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px; }
@@ -728,6 +803,7 @@
   <div class="nav-logo">zoren<span>.</span>dev</div>
   <ul class="nav-links">
     <li><a href="#about">About</a></li>
+    <li><a href="#portfolio">Portfolio</a></li>
     <li><a href="#services">Services</a></li>
     <li><a href="#process">Process</a></li>
     <li><a href="#industries">Industries</a></li>
@@ -919,6 +995,168 @@
         <span class="pill">TabPy</span>
         <span class="pill">GitHub Actions</span>
       </div>
+    </div>
+  </div>
+</section>
+
+<!-- ── PORTFOLIO ── -->
+<section id="portfolio">
+  <div class="reveal">
+    <div class="section-eyebrow">Proof Of Work</div>
+    <h2 class="section-heading">Dashboards you can click into right now</h2>
+    <p class="section-sub">A working sample of published Tableau Public vizzes — polished KPI dashboards, client-style business reports, and hands-on technique exercises. Every thumbnail links to the live, fully interactive version.</p>
+  </div>
+
+  <div class="portfolio-group reveal">
+    <div class="portfolio-group-label">Featured Dashboards</div>
+    <div class="portfolio-grid">
+
+      <a class="portfolio-card" href="https://public.tableau.com/app/profile/zoren.cordon/viz/TableauFreshTakesSeries/1_1_BANwLINETrend" target="_blank" rel="noopener noreferrer">
+        <div class="portfolio-thumb-wrap">
+          <img src="assets/dashboards/freshtakes-series.png" alt="#TableauFreshTakes Series dashboard thumbnail" loading="lazy" />
+          <div class="portfolio-views"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>138</div>
+          <div class="portfolio-overlay"><span class="portfolio-view-link">View Live ↗</span></div>
+        </div>
+        <div class="portfolio-body">
+          <div class="portfolio-title">#TableauFreshTakes Series</div>
+          <div class="portfolio-desc">A bold, headline-KPI dashboard built around a single hero number ($733.2K in sales, +20.4% YoY) backed by a clean trend line — with a toggle between line and bar views of the same trend.</div>
+        </div>
+      </a>
+
+      <a class="portfolio-card" href="https://public.tableau.com/app/profile/zoren.cordon/viz/TableauMasterclassWorkingwithContainers/SALESPERFORMANCEOVERVIEW" target="_blank" rel="noopener noreferrer">
+        <div class="portfolio-thumb-wrap">
+          <img src="assets/dashboards/masterclass-containers.png" alt="Sales Performance Overview dashboard thumbnail" loading="lazy" />
+          <div class="portfolio-views"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>59</div>
+          <div class="portfolio-overlay"><span class="portfolio-view-link">View Live ↗</span></div>
+        </div>
+        <div class="portfolio-body">
+          <div class="portfolio-title">Tableau Masterclass — Sales Performance Overview</div>
+          <div class="portfolio-desc">Built from Andy Kriebel's "Containers Demystified" masterclass and customized with original KPIs — a multi-chart container layout combining trend sparklines, regional sales bars, and a sales-vs-units scatterplot with full filtering.</div>
+        </div>
+      </a>
+
+      <a class="portfolio-card" href="https://public.tableau.com/app/profile/zoren.cordon/viz/MobileDashboard-SOCIALMEDIAKPIs/SOCIALMEDIAKPIs" target="_blank" rel="noopener noreferrer">
+        <div class="portfolio-thumb-wrap">
+          <img src="assets/dashboards/mobile-social-kpis.png" alt="Social Media KPIs mobile dashboard thumbnail" loading="lazy" />
+          <div class="portfolio-views"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>95</div>
+          <div class="portfolio-overlay"><span class="portfolio-view-link">View Live ↗</span></div>
+        </div>
+        <div class="portfolio-body">
+          <div class="portfolio-title">Mobile Dashboard — Social Media KPIs</div>
+          <div class="portfolio-desc">A mobile-first social dashboard with a bold brand treatment, surfacing weekly impressions as a big-number callout with trend context — designed for a phone screen, not a boardroom monitor.</div>
+        </div>
+      </a>
+
+      <a class="portfolio-card" href="https://public.tableau.com/app/profile/zoren.cordon/viz/DZVPhonelayout-SuperstorePulse/SUPERSTOREPULSE" target="_blank" rel="noopener noreferrer">
+        <div class="portfolio-thumb-wrap">
+          <img src="assets/dashboards/superstore-pulse.png" alt="Superstore Pulse mobile dashboard thumbnail" loading="lazy" />
+          <div class="portfolio-views"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>108</div>
+          <div class="portfolio-overlay"><span class="portfolio-view-link">View Live ↗</span></div>
+        </div>
+        <div class="portfolio-body">
+          <div class="portfolio-title">DZV Phone Layout — Superstore Pulse</div>
+          <div class="portfolio-desc">A mobile-optimized retail performance dashboard comparing 2023 vs. 2022 across Sales ($2.3M), Profit ($286K), Discount %, and Customers — each KPI tile expands into a monthly trend on tap.</div>
+        </div>
+      </a>
+
+    </div>
+  </div>
+
+  <div class="portfolio-group reveal">
+    <div class="portfolio-group-label">Client &amp; Business Reporting</div>
+    <div class="portfolio-grid">
+
+      <a class="portfolio-card" href="https://public.tableau.com/app/profile/zoren.cordon/viz/SALESREPORT-customizabledata/SALESREPORT" target="_blank" rel="noopener noreferrer">
+        <div class="portfolio-thumb-wrap">
+          <img src="assets/dashboards/sales-report-customizable.png" alt="Sales Report customizable data dashboard thumbnail" loading="lazy" />
+          <div class="portfolio-views"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>151</div>
+          <div class="portfolio-overlay"><span class="portfolio-view-link">View Live ↗</span></div>
+        </div>
+        <div class="portfolio-body">
+          <div class="portfolio-title">Sales Report — Customizable Data</div>
+          <div class="portfolio-desc">A commission and revenue reporting dashboard built for a travel/airline client — breaks down $9M+ in transactions by commission type, sales trend, running total, and top airline partners, on a fully swappable Google Sheets connection.</div>
+        </div>
+      </a>
+
+      <a class="portfolio-card" href="https://public.tableau.com/app/profile/zoren.cordon/viz/DiamondTrackingReport/Dashboard" target="_blank" rel="noopener noreferrer">
+        <div class="portfolio-thumb-wrap">
+          <img src="assets/dashboards/diamond-tracking-report.png" alt="Diamond Tracking Report dashboard thumbnail" loading="lazy" />
+          <div class="portfolio-views"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>126</div>
+          <div class="portfolio-overlay"><span class="portfolio-view-link">View Live ↗</span></div>
+        </div>
+        <div class="portfolio-body">
+          <div class="portfolio-title">Diamond Tracking Report</div>
+          <div class="portfolio-desc">An inventory and profitability tracker built for a jewelry business client — line-item cost, labor, total price, profit, and profit % broken out across individual diamond SKUs.</div>
+        </div>
+      </a>
+
+    </div>
+  </div>
+
+  <div class="portfolio-group reveal">
+    <div class="portfolio-group-label">Tableau Skills Lab</div>
+    <div class="portfolio-grid">
+
+      <a class="portfolio-card" href="https://public.tableau.com/app/profile/zoren.cordon/viz/Coursera-USDADecluttering_16042474292240/InflationbyMSA" target="_blank" rel="noopener noreferrer">
+        <div class="portfolio-thumb-wrap">
+          <img src="assets/dashboards/coursera-usda-decluttering.png" alt="Retail Food Price Inflation by MSA dashboard thumbnail" loading="lazy" />
+          <div class="portfolio-views"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>85</div>
+          <div class="portfolio-overlay"><span class="portfolio-view-link">View Live ↗</span></div>
+        </div>
+        <div class="portfolio-body">
+          <div class="portfolio-title">Retail Food Price Inflation by MSA</div>
+          <div class="portfolio-desc">A decluttered remake of a USDA inflation chart from a guided Coursera exercise — ranks major U.S. metro areas against the national average with a single clear above/below color split.</div>
+        </div>
+      </a>
+
+      <a class="portfolio-card" href="https://public.tableau.com/app/profile/zoren.cordon/viz/Coursera-SalesSpotlight_16041622648810/SalesSpotlight" target="_blank" rel="noopener noreferrer">
+        <div class="portfolio-thumb-wrap">
+          <img src="assets/dashboards/coursera-sales-spotlight.png" alt="Sales Spotlight highlight table thumbnail" loading="lazy" />
+          <div class="portfolio-views"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>83</div>
+          <div class="portfolio-overlay"><span class="portfolio-view-link">View Live ↗</span></div>
+        </div>
+        <div class="portfolio-body">
+          <div class="portfolio-title">Sales Spotlight</div>
+          <div class="portfolio-desc">A color-coded highlight table tracking Furniture, Office Supplies, and Technology sales by month and year — built to surface seasonal patterns at a glance without a single chart.</div>
+        </div>
+      </a>
+
+      <a class="portfolio-card" href="https://public.tableau.com/app/profile/zoren.cordon/viz/AssignmentDualLayerMaps_16041669448300/DualLayerMaps" target="_blank" rel="noopener noreferrer">
+        <div class="portfolio-thumb-wrap">
+          <img src="assets/dashboards/coursera-dual-layer-maps.png" alt="Dual Layer Maps dashboard thumbnail" loading="lazy" />
+          <div class="portfolio-views"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>93</div>
+          <div class="portfolio-overlay"><span class="portfolio-view-link">View Live ↗</span></div>
+        </div>
+        <div class="portfolio-body">
+          <div class="portfolio-title">Dual Layer Maps</div>
+          <div class="portfolio-desc">A dual-layer U.S. map blending filled regional shading with sized, color-graded bubbles — showing sales volume and profit ratio by state simultaneously.</div>
+        </div>
+      </a>
+
+      <a class="portfolio-card" href="https://public.tableau.com/app/profile/zoren.cordon/viz/ShippingTrendAssigment/ShippingTrend" target="_blank" rel="noopener noreferrer">
+        <div class="portfolio-thumb-wrap">
+          <img src="assets/dashboards/coursera-shipping-trend.png" alt="Shipping Trend area chart dashboard thumbnail" loading="lazy" />
+          <div class="portfolio-views"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>70</div>
+          <div class="portfolio-overlay"><span class="portfolio-view-link">View Live ↗</span></div>
+        </div>
+        <div class="portfolio-body">
+          <div class="portfolio-title">Shipping Trend</div>
+          <div class="portfolio-desc">A stacked area chart breaking down order volume by ship mode and ship status over time — built to quickly isolate where "shipped late" volume spikes.</div>
+        </div>
+      </a>
+
+      <a class="portfolio-card" href="https://public.tableau.com/app/profile/zoren.cordon/viz/CustomerScatterPlotAssignment_16029626065440/CustomerScatter" target="_blank" rel="noopener noreferrer">
+        <div class="portfolio-thumb-wrap">
+          <img src="assets/dashboards/coursera-customer-scatter.png" alt="Customer Scatter Plot dashboard thumbnail" loading="lazy" />
+          <div class="portfolio-views"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>69</div>
+          <div class="portfolio-overlay"><span class="portfolio-view-link">View Live ↗</span></div>
+        </div>
+        <div class="portfolio-body">
+          <div class="portfolio-title">Customer Scatter Plot</div>
+          <div class="portfolio-desc">A profit-vs-sales scatterplot sized by discount and color-graded by profit ratio — built to isolate exactly which high-discount orders are quietly losing money.</div>
+        </div>
+      </a>
+
     </div>
   </div>
 </section>
