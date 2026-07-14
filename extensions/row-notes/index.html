@@ -1,0 +1,336 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Row Notes</title>
+  <script src="./tableau.extensions.1.latest.min.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      font-size: 12px;
+      color: #1a1a1a;
+      background: #fff;
+      height: 100vh;
+      overflow: hidden;
+    }
+    #app { display: flex; flex-direction: column; height: 100vh; }
+
+    .header {
+      background: #1e6eb5;
+      color: #fff;
+      padding: 8px 12px;
+      flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+    }
+    .header h1 { font-size: 12px; font-weight: 700; letter-spacing: .2px; }
+    .header .status { font-size: 10px; opacity: .85; }
+    .header button {
+      background: rgba(255,255,255,.15);
+      color: #fff;
+      border: 1px solid rgba(255,255,255,.4);
+      border-radius: 4px;
+      padding: 4px 9px;
+      font-size: 11px;
+      cursor: pointer;
+    }
+    .header button:hover { background: rgba(255,255,255,.28); }
+
+    .content { flex: 1; overflow: auto; }
+
+    table { border-collapse: collapse; width: 100%; }
+    thead th {
+      position: sticky; top: 0; z-index: 1;
+      background: #f6f7f9;
+      border-bottom: 1px solid #dde1e7;
+      text-align: left;
+      padding: 6px 8px;
+      font-size: 10px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: .3px;
+      color: #555;
+      white-space: nowrap;
+    }
+    thead th.new-col { background: #eaf2fb; color: #1e6eb5; }
+    tbody td {
+      padding: 4px 8px;
+      border-bottom: 1px solid #eef0f3;
+      white-space: nowrap;
+      max-width: 220px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    tbody tr:hover td { background: #fafbfc; }
+    input[type=text].note-input {
+      width: 100%;
+      min-width: 140px;
+      padding: 4px 6px;
+      border: 1px solid #ccd1d9;
+      border-radius: 3px;
+      font-size: 12px;
+    }
+    input[type=text].note-input:focus { border-color: #1e6eb5; outline: none; }
+    select.flag-select {
+      width: 100%;
+      min-width: 80px;
+      padding: 4px 6px;
+      border: 1px solid #ccd1d9;
+      border-radius: 3px;
+      font-size: 12px;
+      background: #fff;
+    }
+    td.new-col { background: #f9fcff; }
+
+    .empty-state, .error-state {
+      padding: 24px 16px;
+      text-align: center;
+      color: #666;
+    }
+    .error-state { color: #b3261e; }
+    .empty-state button, .error-state button {
+      margin-top: 10px;
+      padding: 7px 14px;
+      background: #1e6eb5;
+      color: #fff;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 12px;
+    }
+  </style>
+</head>
+<body>
+  <div id="app">
+    <div class="header">
+      <h1 id="title">Row Notes</h1>
+      <span class="status" id="status"></span>
+      <button id="configureBtn">Configure</button>
+    </div>
+    <div class="content" id="content">
+      <div class="empty-state">Loading...</div>
+    </div>
+  </div>
+
+  <script>
+    let dashboard;
+    let config = {};      // { worksheet, keyField, textLabel, flagLabel }
+    let rowData = {};     // { [keyValue]: { text, flag } }
+    let columns = [];     // current worksheet's summary columns (fieldName list, in order)
+    let saveTimer = null;
+    const dirtyKeys = new Set(); // keys with an unsaved local edit in flight
+
+    function setStatus(text) {
+      document.getElementById('status').textContent = text || '';
+    }
+
+    function loadConfig() {
+      const s = tableau.extensions.settings.getAll();
+      config = {
+        worksheet:  s.configWorksheet || '',
+        keyField:   s.keyField || '',
+        textLabel:  s.textLabel || 'Notes',
+        flagLabel:  s.flagLabel || 'Reviewed',
+      };
+      try { rowData = s.rowData ? JSON.parse(s.rowData) : {}; }
+      catch (_) { rowData = {}; }
+    }
+
+    function renderUnconfigured(message) {
+      document.getElementById('content').innerHTML =
+        '<div class="empty-state">' +
+        (message || 'This extension has not been configured yet.') +
+        '<br><button id="configureNow">Configure</button></div>';
+      document.getElementById('configureNow').addEventListener('click', openConfigure);
+    }
+
+    function renderError(message) {
+      document.getElementById('content').innerHTML =
+        '<div class="error-state">' + escapeHtml(message) + '</div>';
+    }
+
+    function escapeHtml(str) {
+      const d = document.createElement('div');
+      d.textContent = str == null ? '' : String(str);
+      return d.innerHTML;
+    }
+
+    async function loadAndRender() {
+      if (!config.worksheet || !config.keyField) {
+        renderUnconfigured();
+        return;
+      }
+      const ws = dashboard.worksheets.find(w => w.name === config.worksheet);
+      if (!ws) {
+        renderUnconfigured('Configured worksheet "' + config.worksheet + '" was not found on this dashboard. It may have been renamed or removed.');
+        return;
+      }
+
+      let table;
+      try {
+        table = await ws.getSummaryDataAsync({ ignoreSelection: true });
+      } catch (e) {
+        renderError('Could not read data from "' + config.worksheet + '": ' + e.message);
+        return;
+      }
+
+      columns = table.columns.map(c => c.fieldName);
+      const keyIdx = columns.indexOf(config.keyField);
+      if (keyIdx === -1) {
+        renderUnconfigured('Configured row identifier field "' + config.keyField + '" is no longer available on "' + config.worksheet + '".');
+        return;
+      }
+
+      document.getElementById('title').textContent = 'Row Notes — ' + config.worksheet;
+
+      if (table.totalRowCount === 0) {
+        document.getElementById('content').innerHTML =
+          '<div class="empty-state">No rows to show (check filters on "' + config.worksheet + '").</div>';
+        return;
+      }
+
+      const rows = table.data.map(r => r.map(cell => cell.formattedValue));
+      renderTable(rows, keyIdx);
+    }
+
+    function renderTable(rows, keyIdx) {
+      const seenKeys = new Set();
+      let html = '<table><thead><tr>';
+      columns.forEach(c => { html += '<th>' + escapeHtml(c) + '</th>'; });
+      html += '<th class="new-col">' + escapeHtml(config.textLabel) + '</th>';
+      html += '<th class="new-col">' + escapeHtml(config.flagLabel) + '</th>';
+      html += '</tr></thead><tbody>';
+
+      rows.forEach((cells, rowIdx) => {
+        const key = cells[keyIdx];
+        if (seenKeys.has(key)) return; // guard against a non-unique key field
+        seenKeys.add(key);
+        const saved = rowData[key] || { text: '', flag: '' };
+
+        html += '<tr data-key="' + escapeHtml(key) + '">';
+        cells.forEach(v => { html += '<td>' + escapeHtml(v) + '</td>'; });
+        html += '<td class="new-col"><input type="text" class="note-input" data-row-key="' +
+          escapeHtml(key) + '" value="' + escapeHtml(saved.text) + '"></td>';
+        html += '<td class="new-col"><select class="flag-select" data-row-key="' + escapeHtml(key) + '">' +
+          ['', 'Yes', 'No'].map(opt =>
+            '<option value="' + opt + '"' + (saved.flag === opt ? ' selected' : '') + '>' +
+            (opt || '—') + '</option>'
+          ).join('') +
+          '</select></td>';
+        html += '</tr>';
+      });
+      html += '</tbody></table>';
+
+      document.getElementById('content').innerHTML = html;
+
+      document.querySelectorAll('.note-input').forEach(el => {
+        el.addEventListener('input', onEdit);
+      });
+      document.querySelectorAll('.flag-select').forEach(el => {
+        el.addEventListener('change', onEdit);
+      });
+    }
+
+    function onEdit(e) {
+      const key = e.target.getAttribute('data-row-key');
+      const row = document.querySelector('tr[data-key="' + CSS.escape(key) + '"]');
+      const text = row.querySelector('.note-input').value;
+      const flag = row.querySelector('.flag-select').value;
+
+      rowData[key] = { text, flag };
+      dirtyKeys.add(key);
+      scheduleSave();
+    }
+
+    function scheduleSave() {
+      setStatus('Editing...');
+      clearTimeout(saveTimer);
+      saveTimer = setTimeout(persist, 600);
+    }
+
+    async function persist() {
+      setStatus('Saving...');
+      try {
+        tableau.extensions.settings.set('rowData', JSON.stringify(rowData));
+        await tableau.extensions.settings.saveAsync();
+        dirtyKeys.clear();
+        setStatus('Saved');
+        setTimeout(() => setStatus(''), 1500);
+      } catch (e) {
+        setStatus('Save failed: ' + e.message);
+      }
+    }
+
+    // Merge in settings saved by another session without clobbering this
+    // user's in-flight (unsaved) edits or whatever field they're actively typing in.
+    function onSettingsChanged() {
+      const s = tableau.extensions.settings.getAll();
+      let incoming = {};
+      try { incoming = s.rowData ? JSON.parse(s.rowData) : {}; }
+      catch (_) { return; }
+
+      const active = document.activeElement;
+      const activeKey = active && active.getAttribute && active.getAttribute('data-row-key');
+
+      Object.keys(incoming).forEach(key => {
+        if (dirtyKeys.has(key)) return;
+        rowData[key] = incoming[key];
+        if (key === activeKey) return;
+        const row = document.querySelector('tr[data-key="' + CSS.escape(key) + '"]');
+        if (!row) return;
+        row.querySelector('.note-input').value = incoming[key].text || '';
+        row.querySelector('.flag-select').value = incoming[key].flag || '';
+      });
+    }
+
+    async function openConfigure() {
+      const payload = JSON.stringify({
+        worksheet: config.worksheet, keyField: config.keyField,
+        textLabel: config.textLabel, flagLabel: config.flagLabel,
+      });
+      try {
+        const result = await tableau.extensions.ui.displayDialogAsync(
+          './config.html', payload, { height: 480, width: 440 }
+        );
+        if (!result) return;
+        const parsed = JSON.parse(result);
+        tableau.extensions.settings.set('configWorksheet', parsed.worksheet);
+        tableau.extensions.settings.set('keyField', parsed.keyField);
+        tableau.extensions.settings.set('textLabel', parsed.textLabel);
+        tableau.extensions.settings.set('flagLabel', parsed.flagLabel);
+        await tableau.extensions.settings.saveAsync();
+        loadConfig();
+        await loadAndRender();
+      } catch (e) {
+        // user cancelled the dialog - ErrorCodes.DialogClosedByUser - nothing to do
+      }
+    }
+
+    async function init() {
+      await tableau.extensions.initializeAsync({ configure: openConfigure });
+      dashboard = tableau.extensions.dashboardContent.dashboard;
+      loadConfig();
+      await loadAndRender();
+
+      document.getElementById('configureBtn').addEventListener('click', openConfigure);
+      tableau.extensions.settings.addEventListener(
+        tableau.TableauEventType.SettingsChanged, onSettingsChanged
+      );
+
+      if (config.worksheet) {
+        const ws = dashboard.worksheets.find(w => w.name === config.worksheet);
+        if (ws) {
+          ws.addEventListener(tableau.TableauEventType.FilterChanged, loadAndRender);
+          ws.addEventListener(tableau.TableauEventType.SummaryDataChanged, loadAndRender);
+        }
+      }
+    }
+
+    init().catch(e => renderError('Failed to initialize: ' + e.message));
+  </script>
+</body>
+</html>

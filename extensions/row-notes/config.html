@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Row Notes - Configure</title>
+  <script src="./tableau.extensions.1.latest.min.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      font-size: 13px;
+      color: #1a1a1a;
+      background: #fff;
+      padding: 16px;
+    }
+    h1 { font-size: 15px; margin-bottom: 4px; }
+    p.hint { font-size: 11px; color: #666; margin-bottom: 14px; }
+    label {
+      display: block;
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: .4px;
+      color: #555;
+      margin: 12px 0 4px;
+    }
+    select, input[type=text] {
+      width: 100%;
+      padding: 7px 8px;
+      border: 1px solid #ccd1d9;
+      border-radius: 4px;
+      font-size: 13px;
+    }
+    .row { display: flex; gap: 10px; }
+    .row > div { flex: 1; }
+    .actions {
+      margin-top: 20px;
+      display: flex;
+      justify-content: flex-end;
+      gap: 8px;
+    }
+    button {
+      padding: 8px 16px;
+      border-radius: 4px;
+      border: 1px solid transparent;
+      font-size: 13px;
+      cursor: pointer;
+    }
+    button.primary { background: #1e6eb5; color: #fff; }
+    button.primary:disabled { background: #a9c6e2; cursor: not-allowed; }
+    button.secondary { background: #f0f2f5; color: #333; border-color: #ccd1d9; }
+    .error { color: #b3261e; font-size: 11px; margin-top: 10px; }
+  </style>
+</head>
+<body>
+  <h1>Row Notes - Configuration</h1>
+  <p class="hint">Pick the worksheet whose rows you want to annotate, the field that uniquely identifies each row, and labels for your two input columns.</p>
+
+  <label for="worksheet">Worksheet (table view)</label>
+  <select id="worksheet"></select>
+
+  <label for="keyField">Row identifier field</label>
+  <select id="keyField"></select>
+  <p class="hint" style="margin-top:4px;">Must be a field that is unique per row (e.g. Campaign ID). Saved notes are keyed to this value, so they survive re-filtering and re-sorting.</p>
+
+  <div class="row">
+    <div>
+      <label for="textLabel">Text column label</label>
+      <input type="text" id="textLabel" value="Notes">
+    </div>
+    <div>
+      <label for="flagLabel">Yes/No column label</label>
+      <input type="text" id="flagLabel" value="Reviewed">
+    </div>
+  </div>
+
+  <div id="error" class="error"></div>
+
+  <div class="actions">
+    <button class="secondary" id="cancelBtn">Cancel</button>
+    <button class="primary" id="saveBtn" disabled>Save</button>
+  </div>
+
+  <script>
+    let dashboard;
+
+    function showError(msg) {
+      document.getElementById('error').textContent = msg || '';
+    }
+
+    async function populateKeyFieldOptions() {
+      const wsSelect = document.getElementById('worksheet');
+      const keySelect = document.getElementById('keyField');
+      const wsName = wsSelect.value;
+      keySelect.innerHTML = '<option>Loading columns...</option>';
+      showError('');
+
+      const ws = dashboard.worksheets.find(w => w.name === wsName);
+      if (!ws) { showError('Worksheet not found.'); return; }
+
+      try {
+        const table = await ws.getSummaryDataAsync({ ignoreSelection: true, maxRows: 1 });
+        keySelect.innerHTML = '';
+        table.columns.forEach(col => {
+          const opt = document.createElement('option');
+          opt.value = col.fieldName;
+          opt.textContent = col.fieldName;
+          keySelect.appendChild(opt);
+        });
+        document.getElementById('saveBtn').disabled = table.columns.length === 0;
+      } catch (e) {
+        showError('Could not read columns from that worksheet: ' + e.message);
+      }
+    }
+
+    async function init() {
+      const openPayload = await tableau.extensions.initializeDialogAsync();
+      dashboard = tableau.extensions.dashboardContent.dashboard;
+
+      const wsSelect = document.getElementById('worksheet');
+      dashboard.worksheets.forEach(ws => {
+        const opt = document.createElement('option');
+        opt.value = ws.name;
+        opt.textContent = ws.name;
+        wsSelect.appendChild(opt);
+      });
+
+      let existing = null;
+      try { existing = openPayload ? JSON.parse(openPayload) : null; } catch (_) {}
+      const settings = tableau.extensions.settings.getAll();
+
+      const savedWorksheet = (existing && existing.worksheet) || settings.configWorksheet;
+      const savedKeyField  = (existing && existing.keyField)  || settings.keyField;
+      const savedTextLabel = (existing && existing.textLabel) || settings.textLabel;
+      const savedFlagLabel = (existing && existing.flagLabel) || settings.flagLabel;
+
+      if (savedWorksheet && dashboard.worksheets.some(w => w.name === savedWorksheet)) {
+        wsSelect.value = savedWorksheet;
+      }
+      if (savedTextLabel) document.getElementById('textLabel').value = savedTextLabel;
+      if (savedFlagLabel) document.getElementById('flagLabel').value = savedFlagLabel;
+
+      await populateKeyFieldOptions();
+      if (savedKeyField) {
+        const keySelect = document.getElementById('keyField');
+        if ([...keySelect.options].some(o => o.value === savedKeyField)) {
+          keySelect.value = savedKeyField;
+        }
+      }
+
+      wsSelect.addEventListener('change', populateKeyFieldOptions);
+
+      document.getElementById('saveBtn').addEventListener('click', () => {
+        const payload = {
+          worksheet:  wsSelect.value,
+          keyField:   document.getElementById('keyField').value,
+          textLabel:  document.getElementById('textLabel').value.trim() || 'Notes',
+          flagLabel:  document.getElementById('flagLabel').value.trim() || 'Reviewed',
+        };
+        if (!payload.worksheet || !payload.keyField) {
+          showError('Choose a worksheet and a row identifier field.');
+          return;
+        }
+        tableau.extensions.ui.closeDialog(JSON.stringify(payload));
+      });
+
+      document.getElementById('cancelBtn').addEventListener('click', () => {
+        tableau.extensions.ui.closeDialog('');
+      });
+    }
+
+    init().catch(e => showError('Failed to load: ' + e.message));
+  </script>
+</body>
+</html>

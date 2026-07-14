@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest manifest-version="0.1" xmlns="http://www.tableau.com/xml/extension_manifest">
+  <dashboard-extension id="com.example.row-notes" extension-version="1.0.0">
+    <default-locale>en_US</default-locale>
+    <name>Row Notes</name>
+    <description>Add a free-text note and a Yes/No flag to individual rows of a table worksheet</description>
+    <author name="Author" email="author@example.com" organization="Example" website="https://example.com"/>
+    <min-api-version>1.7</min-api-version>
+    <source-location>
+      <url>https://zorentableaudev.github.io/extensions/row-notes/index.html</url>
+    </source-location>
+    <icon>iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==</icon>
+  </dashboard-extension>
+</manifest>
