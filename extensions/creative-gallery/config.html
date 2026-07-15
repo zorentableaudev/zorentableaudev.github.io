@@ -68,6 +68,11 @@
       width: 22px; height: 22px; cursor: pointer; font-size: 11px; color: #444;
     }
     .order-item button:disabled { opacity: .3; cursor: default; }
+    .alias-editor {
+      background: #f9fafb;
+      border-top: 1px dashed #dde1e7;
+      padding: 8px;
+    }
 
     .actions {
       margin-top: 20px;
@@ -104,8 +109,19 @@
       <select id="imageField"></select>
     </div>
     <div>
+      <label for="imageAlias">Image column header (optional)</label>
+      <input type="text" id="imageAlias" placeholder="Defaults to field name">
+    </div>
+  </div>
+
+  <div class="row">
+    <div>
       <label for="titleField">Title field (optional)</label>
       <select id="titleField"></select>
+    </div>
+    <div>
+      <label for="titleAlias">Title column header (optional)</label>
+      <input type="text" id="titleAlias" placeholder="Defaults to field name">
     </div>
   </div>
 
@@ -113,6 +129,22 @@
   <select id="filterField"></select>
   <p class="hint">The value passed to target sheets when a creative is clicked. Must exist as a field on those sheets too (e.g. Creative Name or Creative ID).</p>
 
+  <h2>Sort</h2>
+  <div class="row">
+    <div>
+      <label for="sortField">Sort by</label>
+      <select id="sortField"><option value="">(worksheet order)</option></select>
+    </div>
+    <div>
+      <label for="sortDirection">Direction</label>
+      <select id="sortDirection">
+        <option value="asc">Ascending</option>
+        <option value="desc">Descending</option>
+      </select>
+    </div>
+  </div>
+
+  <h2>Layout &amp; sizing</h2>
   <div class="row">
     <div>
       <label for="layout">Layout</label>
@@ -125,13 +157,29 @@
       <label for="columns">Tiles per row</label>
       <input type="number" id="columns" min="2" max="8" value="4">
     </div>
+    <div id="rowHeightWrap">
+      <label for="rowHeight">Row height (px, blank = auto)</label>
+      <input type="number" id="rowHeight" min="20" max="300" placeholder="auto">
+    </div>
   </div>
+  <div class="row">
+    <div>
+      <label for="imageHeight">Image height (px)</label>
+      <input type="number" id="imageHeight" min="20" max="400" value="90">
+    </div>
+    <div id="imageWidthWrap">
+      <label for="imageWidth">Image width (px, table only)</label>
+      <input type="number" id="imageWidth" min="20" max="400" value="60">
+    </div>
+  </div>
+  <p class="hint">Table column widths and column order can also be adjusted by dragging directly in the extension once it's on the dashboard.</p>
 
   <h2>Metrics &amp; dimensions to show</h2>
   <p class="hint">Everything else from the source worksheet you want displayed alongside each image.</p>
   <div class="box" id="fieldChecklist"></div>
 
-  <h2>Display order</h2>
+  <h2>Display order &amp; header labels</h2>
+  <p class="hint">Use "Alias" to rename a header without renaming the underlying field.</p>
   <div class="order-list" id="orderList"></div>
 
   <h2>Sheets to filter when a creative is clicked</h2>
@@ -149,12 +197,21 @@
     let fieldNames = [];
     let title = '';
     let imageField = '';
+    let imageAlias = '';
     let titleField = '';
+    let titleAlias = '';
     let filterField = '';
+    let sortField = '';
+    let sortDirection = 'asc';
     let layout = 'card';
     let columns = 4;
+    let rowHeight = '';
+    let imageHeight = 90;
+    let imageWidth = 60;
     let displayFields = [];
+    let fieldAliases = {};
     let targetWorksheets = [];
+    let editingField = null;
 
     function showError(msg) { document.getElementById('error').textContent = msg || ''; }
 
@@ -164,8 +221,9 @@
       return d.innerHTML;
     }
 
-    function fillSelect(sel, options, current) {
-      sel.innerHTML = options.map(f => '<option value="' + escapeHtml(f) + '">' + escapeHtml(f) + '</option>').join('');
+    function fillSelect(sel, options, current, withNone) {
+      sel.innerHTML = (withNone ? '<option value="">(none)</option>' : '') +
+        options.map(f => '<option value="' + escapeHtml(f) + '">' + escapeHtml(f) + '</option>').join('');
       if (current && options.includes(current)) sel.value = current;
     }
 
@@ -196,17 +254,25 @@
         list.innerHTML = '<div class="order-item"><span class="hint">Nothing selected yet.</span></div>';
         return;
       }
-      list.innerHTML = displayFields.map((f, i) =>
-        '<div class="order-item">' +
-        '<button type="button" data-action="up" data-index="' + i + '" ' + (i === 0 ? 'disabled' : '') + '>&uarr;</button>' +
-        '<button type="button" data-action="down" data-index="' + i + '" ' + (i === displayFields.length - 1 ? 'disabled' : '') + '>&darr;</button>' +
-        '<span class="label">' + escapeHtml(f) + '</span>' +
-        '</div>'
-      ).join('');
+      list.innerHTML = displayFields.map((f, i) => {
+        let row = '<div class="order-item">' +
+          '<button type="button" data-action="up" data-index="' + i + '" ' + (i === 0 ? 'disabled' : '') + '>&uarr;</button>' +
+          '<button type="button" data-action="down" data-index="' + i + '" ' + (i === displayFields.length - 1 ? 'disabled' : '') + '>&darr;</button>' +
+          '<span class="label">' + escapeHtml(fieldAliases[f] || f) + '</span>' +
+          '<button type="button" data-action="edit" data-field="' + escapeHtml(f) + '">Alias</button>' +
+          '</div>';
+        if (editingField === f) {
+          row += '<div class="alias-editor"><input type="text" data-alias-for="' + escapeHtml(f) +
+            '" value="' + escapeHtml(fieldAliases[f] || '') + '" placeholder="Header label for ' + escapeHtml(f) + '"></div>';
+        }
+        return row;
+      }).join('');
     }
 
-    function updateColumnsVisibility() {
+    function updateSizingVisibility() {
       document.getElementById('columnsWrap').style.display = layout === 'card' ? '' : 'none';
+      document.getElementById('rowHeightWrap').style.display = layout === 'table' ? '' : 'none';
+      document.getElementById('imageWidthWrap').style.display = layout === 'table' ? '' : 'none';
     }
 
     function updateSaveEnabled() {
@@ -229,18 +295,17 @@
       }
       fieldNames = table.columns.map(c => c.fieldName);
 
-      fillSelect(document.getElementById('imageField'), fieldNames, preserve ? imageField : '');
-      const titleSel = document.getElementById('titleField');
-      titleSel.innerHTML = '<option value="">(none)</option>' +
-        fieldNames.map(f => '<option value="' + escapeHtml(f) + '">' + escapeHtml(f) + '</option>').join('');
-      if (preserve && titleField && fieldNames.includes(titleField)) titleSel.value = titleField;
-      fillSelect(document.getElementById('filterField'), fieldNames, preserve ? filterField : '');
+      fillSelect(document.getElementById('imageField'), fieldNames, preserve ? imageField : '', false);
+      fillSelect(document.getElementById('titleField'), fieldNames, preserve ? titleField : '', true);
+      fillSelect(document.getElementById('filterField'), fieldNames, preserve ? filterField : '', false);
+      fillSelect(document.getElementById('sortField'), fieldNames, preserve ? sortField : '', true);
 
       imageField = document.getElementById('imageField').value;
-      titleField = titleSel.value;
+      titleField = document.getElementById('titleField').value;
       filterField = document.getElementById('filterField').value;
+      sortField = document.getElementById('sortField').value;
 
-      if (!preserve) { targetWorksheets = []; displayFields = []; }
+      if (!preserve) { targetWorksheets = []; displayFields = []; fieldAliases = {}; }
       else { displayFields = displayFields.filter(f => fieldNames.includes(f) && f !== imageField); }
 
       renderTargetChecklist();
@@ -269,21 +334,37 @@
       }
       title = (existing && existing.title) || '';
       imageField = (existing && existing.imageField) || '';
+      imageAlias = (existing && existing.imageAlias) || '';
       titleField = (existing && existing.titleField) || '';
+      titleAlias = (existing && existing.titleAlias) || '';
       filterField = (existing && existing.filterField) || '';
+      sortField = (existing && existing.sortField) || '';
+      sortDirection = (existing && existing.sortDirection) || 'asc';
       layout = (existing && existing.layout) || 'card';
       columns = (existing && existing.columns) || 4;
+      rowHeight = (existing && existing.rowHeight) || '';
+      imageHeight = (existing && existing.imageHeight) || 90;
+      imageWidth = (existing && existing.imageWidth) || 60;
       displayFields = Array.isArray(existing && existing.displayFields) ? existing.displayFields : [];
+      fieldAliases = (existing && existing.fieldAliases && typeof existing.fieldAliases === 'object') ? existing.fieldAliases : {};
       targetWorksheets = (existing && existing.targetWorksheets) || [];
 
       document.getElementById('extTitle').value = title;
+      document.getElementById('imageAlias').value = imageAlias;
+      document.getElementById('titleAlias').value = titleAlias;
+      document.getElementById('sortDirection').value = sortDirection;
       document.getElementById('layout').value = layout;
       document.getElementById('columns').value = columns;
-      updateColumnsVisibility();
+      document.getElementById('rowHeight').value = rowHeight;
+      document.getElementById('imageHeight').value = imageHeight;
+      document.getElementById('imageWidth').value = imageWidth;
+      updateSizingVisibility();
 
       await onWorksheetChange(true);
 
       document.getElementById('extTitle').addEventListener('input', e => { title = e.target.value; });
+      document.getElementById('imageAlias').addEventListener('input', e => { imageAlias = e.target.value; });
+      document.getElementById('titleAlias').addEventListener('input', e => { titleAlias = e.target.value; });
       wsSelect.addEventListener('change', () => onWorksheetChange(false));
       document.getElementById('imageField').addEventListener('change', e => {
         imageField = e.target.value;
@@ -294,10 +375,24 @@
       });
       document.getElementById('titleField').addEventListener('change', e => { titleField = e.target.value; });
       document.getElementById('filterField').addEventListener('change', e => { filterField = e.target.value; updateSaveEnabled(); });
-      document.getElementById('layout').addEventListener('change', e => { layout = e.target.value; updateColumnsVisibility(); });
+      document.getElementById('sortField').addEventListener('change', e => { sortField = e.target.value; });
+      document.getElementById('sortDirection').addEventListener('change', e => { sortDirection = e.target.value; });
+      document.getElementById('layout').addEventListener('change', e => { layout = e.target.value; updateSizingVisibility(); });
       document.getElementById('columns').addEventListener('input', e => {
         const n = parseInt(e.target.value, 10);
         columns = Number.isFinite(n) ? Math.min(8, Math.max(2, n)) : 4;
+      });
+      document.getElementById('rowHeight').addEventListener('input', e => {
+        const n = parseInt(e.target.value, 10);
+        rowHeight = Number.isFinite(n) ? n : '';
+      });
+      document.getElementById('imageHeight').addEventListener('input', e => {
+        const n = parseInt(e.target.value, 10);
+        imageHeight = Number.isFinite(n) ? n : 90;
+      });
+      document.getElementById('imageWidth').addEventListener('input', e => {
+        const n = parseInt(e.target.value, 10);
+        imageWidth = Number.isFinite(n) ? n : 60;
       });
 
       document.getElementById('fieldChecklist').addEventListener('change', e => {
@@ -307,6 +402,7 @@
           if (!displayFields.includes(field)) displayFields.push(field);
         } else {
           displayFields = displayFields.filter(f => f !== field);
+          if (editingField === field) editingField = null;
         }
         renderOrderList();
       });
@@ -314,11 +410,26 @@
       document.getElementById('orderList').addEventListener('click', e => {
         const action = e.target.getAttribute('data-action');
         if (!action) return;
-        const index = parseInt(e.target.getAttribute('data-index'), 10);
-        const j = action === 'up' ? index - 1 : index + 1;
-        if (j < 0 || j >= displayFields.length) return;
-        [displayFields[index], displayFields[j]] = [displayFields[j], displayFields[index]];
+        if (action === 'up' || action === 'down') {
+          const index = parseInt(e.target.getAttribute('data-index'), 10);
+          const j = action === 'up' ? index - 1 : index + 1;
+          if (j < 0 || j >= displayFields.length) return;
+          [displayFields[index], displayFields[j]] = [displayFields[j], displayFields[index]];
+          renderOrderList();
+        } else if (action === 'edit') {
+          const field = e.target.getAttribute('data-field');
+          editingField = editingField === field ? null : field;
+          renderOrderList();
+        }
+      });
+
+      document.getElementById('orderList').addEventListener('input', e => {
+        const field = e.target.getAttribute('data-alias-for');
+        if (!field) return;
+        if (e.target.value.trim()) fieldAliases[field] = e.target.value;
+        else delete fieldAliases[field];
         renderOrderList();
+        document.querySelector('[data-alias-for="' + CSS.escape(field) + '"]').focus();
       });
 
       document.getElementById('targetChecklist').addEventListener('change', e => {
@@ -341,11 +452,19 @@
           worksheet: wsName,
           title,
           imageField,
+          imageAlias,
           titleField,
+          titleAlias,
           filterField,
+          sortField,
+          sortDirection,
           layout,
           columns,
+          rowHeight,
+          imageHeight,
+          imageWidth,
           displayFields,
+          fieldAliases,
           targetWorksheets,
         }));
       });

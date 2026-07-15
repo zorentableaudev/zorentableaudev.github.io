@@ -42,7 +42,7 @@
     .header button:hover { background: rgba(255,255,255,.28); }
     .header button:disabled { opacity: .4; cursor: default; }
 
-    .content { flex: 1; overflow: auto; }
+    .content { flex: 1; overflow: auto; position: relative; }
 
     /* Card grid layout */
     .gallery {
@@ -62,7 +62,6 @@
     .tile.active { border-color: #1e6eb5; box-shadow: 0 0 0 2px rgba(30,110,181,.25); }
     .tile img {
       width: 100%;
-      height: 90px;
       object-fit: cover;
       display: block;
       background: #eef0f3;
@@ -89,7 +88,7 @@
     .tile-metric .metric-value { font-weight: 600; white-space: nowrap; }
 
     /* Table layout */
-    table { border-collapse: collapse; width: 100%; }
+    table { border-collapse: collapse; width: 100%; table-layout: fixed; }
     thead th {
       position: sticky; top: 0; z-index: 1;
       background: #f6f7f9;
@@ -102,18 +101,32 @@
       letter-spacing: .3px;
       color: #555;
       white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
     }
+    thead th.draggable { cursor: grab; position: relative; }
+    thead th.dragging { opacity: .5; }
+    .resize-handle {
+      position: absolute;
+      right: -3px;
+      top: 0;
+      width: 6px;
+      height: 100%;
+      cursor: col-resize;
+      z-index: 2;
+    }
+    .resize-handle:hover, .resize-handle.active { background: rgba(30,110,181,.4); }
     tbody td {
       padding: 4px 8px;
       border-bottom: 1px solid #eef0f3;
+      overflow: hidden;
+      text-overflow: ellipsis;
       white-space: nowrap;
     }
     tr.row-item { cursor: pointer; }
     tr.row-item:hover td { background: #fafbfc; }
     tr.row-item.active td { background: #eaf2fb; }
     td.thumb-cell img {
-      width: 60px;
-      height: 40px;
       object-fit: cover;
       display: block;
       background: #eef0f3;
@@ -137,6 +150,30 @@
       cursor: pointer;
       font-size: 12px;
     }
+
+    #hoverPreview {
+      position: fixed;
+      z-index: 1000;
+      pointer-events: none;
+      background: #fff;
+      border: 1px solid #ccd1d9;
+      border-radius: 6px;
+      box-shadow: 0 4px 16px rgba(0,0,0,.18);
+      padding: 8px;
+      display: none;
+      max-width: 280px;
+    }
+    #hoverPreview img {
+      display: block;
+      max-width: 260px;
+      max-height: 200px;
+      object-fit: contain;
+      background: #eef0f3;
+      border-radius: 4px;
+    }
+    #hoverPreview .hp-title { font-size: 12px; font-weight: 700; margin-top: 6px; }
+    #hoverPreview .hp-metric { display: flex; justify-content: space-between; gap: 10px; font-size: 11px; color: #444; line-height: 1.5; }
+    #hoverPreview .hp-metric .metric-label { color: #777; }
   </style>
 </head>
 <body>
@@ -152,18 +189,28 @@
     <div class="content" id="content">
       <div class="empty-state">Loading...</div>
     </div>
+    <div id="hoverPreview"></div>
   </div>
 
   <script>
     let dashboard;
     let boundWs = null;
     let config = {
-      worksheet: '', title: '', imageField: '', titleField: '', filterField: '',
-      layout: 'card', columns: 4, displayFields: [], targetWorksheets: [],
+      worksheet: '', title: '', imageField: '', imageAlias: '', titleField: '', titleAlias: '',
+      filterField: '', sortField: '', sortDirection: 'asc', layout: 'card', columns: 4,
+      rowHeight: '', imageHeight: 90, imageWidth: 60, displayFields: [], fieldAliases: {},
+      targetWorksheets: [],
     };
+    let columnWidths = {}; // { [field]: px } - table column widths, persisted separately
     let selectedValue = null;
+    let lastItems = [];
+    let lastItemsByValue = new Map();
+    let resizingField = null;
+    let headerDragField = null;
+    let lastHoverValue = null;
 
     const content = document.getElementById('content');
+    const hoverPreview = document.getElementById('hoverPreview');
 
     function setStatus(text) {
       document.getElementById('status').textContent = text || '';
@@ -173,6 +220,20 @@
       const d = document.createElement('div');
       d.textContent = str == null ? '' : String(str);
       return d.innerHTML;
+    }
+
+    function fieldColId(field) {
+      return 'col_' + field.replace(/[^a-zA-Z0-9]/g, '_');
+    }
+
+    function aliasFor(field) {
+      if (field === config.imageField) return config.imageAlias || config.imageField;
+      if (field === config.titleField) return config.titleAlias || config.titleField;
+      return (config.fieldAliases && config.fieldAliases[field]) || field;
+    }
+
+    function colWidth(field) {
+      return columnWidths[field] != null ? columnWidths[field] : 140;
     }
 
     function isConfigured() {
@@ -187,13 +248,22 @@
         worksheet: parsed.worksheet || '',
         title: parsed.title || '',
         imageField: parsed.imageField || '',
+        imageAlias: parsed.imageAlias || '',
         titleField: parsed.titleField || '',
+        titleAlias: parsed.titleAlias || '',
         filterField: parsed.filterField || '',
+        sortField: parsed.sortField || '',
+        sortDirection: parsed.sortDirection === 'desc' ? 'desc' : 'asc',
         layout: parsed.layout === 'table' ? 'table' : 'card',
         columns: parsed.columns || 4,
+        rowHeight: parsed.rowHeight || '',
+        imageHeight: parsed.imageHeight || 90,
+        imageWidth: parsed.imageWidth || 60,
         displayFields: Array.isArray(parsed.displayFields) ? parsed.displayFields : [],
+        fieldAliases: (parsed.fieldAliases && typeof parsed.fieldAliases === 'object') ? parsed.fieldAliases : {},
         targetWorksheets: Array.isArray(parsed.targetWorksheets) ? parsed.targetWorksheets : [],
       };
+      try { columnWidths = s.columnWidths ? JSON.parse(s.columnWidths) : {}; } catch (_) { columnWidths = {}; }
     }
 
     function renderUnconfigured(message) {
@@ -243,6 +313,7 @@
       const imgIdx = fieldNames.indexOf(config.imageField);
       const filterIdx = fieldNames.indexOf(config.filterField);
       const titleIdx = config.titleField ? fieldNames.indexOf(config.titleField) : -1;
+      const sortIdx = config.sortField ? fieldNames.indexOf(config.sortField) : -1;
       const displayIdx = config.displayFields
         .map(f => ({ field: f, idx: fieldNames.indexOf(f) }))
         .filter(d => d.idx !== -1);
@@ -256,6 +327,8 @@
 
       if (table.totalRowCount === 0) {
         content.innerHTML = '<div class="empty-state">No creatives to show (check filters on "' + config.worksheet + '").</div>';
+        lastItems = [];
+        lastItemsByValue = new Map();
         return;
       }
 
@@ -265,13 +338,29 @@
         const value = r[filterIdx].value;
         if (value == null || seen.has(value)) return;
         seen.add(value);
+        const metricsMap = {};
+        displayIdx.forEach(d => { metricsMap[d.field] = r[d.idx].formattedValue; });
         items.push({
           value: value,
           title: titleIdx !== -1 ? r[titleIdx].formattedValue : r[filterIdx].formattedValue,
           imageUrl: r[imgIdx].formattedValue,
-          metrics: displayIdx.map(d => ({ label: d.field, value: r[d.idx].formattedValue })),
+          metricsMap: metricsMap,
+          sortRaw: sortIdx !== -1 ? r[sortIdx].value : null,
         });
       });
+
+      if (sortIdx !== -1) {
+        items.sort((a, b) => {
+          const av = a.sortRaw, bv = b.sortRaw;
+          let cmp;
+          if (typeof av === 'number' && typeof bv === 'number') cmp = av - bv;
+          else cmp = String(av).localeCompare(String(bv), undefined, { numeric: true });
+          return config.sortDirection === 'desc' ? -cmp : cmp;
+        });
+      }
+
+      lastItems = items;
+      lastItemsByValue = new Map(items.map(it => [String(it.value), it]));
 
       if (config.layout === 'table') renderTable(items);
       else renderCards(items);
@@ -282,12 +371,13 @@
       items.forEach(t => {
         const active = String(t.value) === String(selectedValue) ? ' active' : '';
         html += '<div class="tile' + active + '" data-value="' + escapeHtml(t.value) + '">' +
-          '<img src="' + escapeHtml(t.imageUrl) + '" alt="' + escapeHtml(t.title) + '" loading="lazy" onerror="this.classList.add(\'broken\')">' +
+          '<img src="' + escapeHtml(t.imageUrl) + '" alt="' + escapeHtml(t.title) +
+          '" loading="lazy" style="height:' + config.imageHeight + 'px" onerror="this.classList.add(\'broken\')">' +
           '<div class="tile-body">';
         if (config.titleField) html += '<div class="tile-title">' + escapeHtml(t.title) + '</div>';
-        t.metrics.forEach(m => {
-          html += '<div class="tile-metric"><span class="metric-label">' + escapeHtml(m.label) +
-            '</span><span class="metric-value">' + escapeHtml(m.value) + '</span></div>';
+        config.displayFields.forEach(f => {
+          html += '<div class="tile-metric"><span class="metric-label">' + escapeHtml(aliasFor(f)) +
+            '</span><span class="metric-value">' + escapeHtml(t.metricsMap[f]) + '</span></div>';
         });
         html += '</div></div>';
       });
@@ -297,18 +387,28 @@
     }
 
     function renderTable(items) {
-      const metricFields = config.displayFields;
-      let html = '<table><thead><tr><th></th>';
-      if (config.titleField) html += '<th>' + escapeHtml(config.titleField) + '</th>';
-      metricFields.forEach(f => { html += '<th>' + escapeHtml(f) + '</th>'; });
+      let html = '<table><colgroup><col style="width:' + config.imageWidth + 'px">';
+      if (config.titleField) html += '<col>';
+      config.displayFields.forEach(f => {
+        html += '<col id="' + fieldColId(f) + '" style="width:' + colWidth(f) + 'px">';
+      });
+      html += '</colgroup><thead><tr>';
+      html += '<th>' + escapeHtml(config.imageAlias || 'Image') + '</th>';
+      if (config.titleField) html += '<th>' + escapeHtml(aliasFor(config.titleField)) + '</th>';
+      config.displayFields.forEach(f => {
+        html += '<th class="draggable" data-field="' + escapeHtml(f) + '">' + escapeHtml(aliasFor(f)) +
+          '<div class="resize-handle" data-field="' + escapeHtml(f) + '"></div></th>';
+      });
       html += '</tr></thead><tbody>';
+
       items.forEach(t => {
         const active = String(t.value) === String(selectedValue) ? ' active' : '';
-        html += '<tr class="row-item' + active + '" data-value="' + escapeHtml(t.value) + '">' +
+        const rowStyle = config.rowHeight ? ' style="height:' + config.rowHeight + 'px"' : '';
+        html += '<tr class="row-item' + active + '" data-value="' + escapeHtml(t.value) + '"' + rowStyle + '>' +
           '<td class="thumb-cell"><img src="' + escapeHtml(t.imageUrl) + '" alt="' + escapeHtml(t.title) +
-          '" loading="lazy" onerror="this.classList.add(\'broken\')"></td>';
+          '" loading="lazy" style="width:' + config.imageWidth + 'px;height:' + config.imageHeight + 'px" onerror="this.classList.add(\'broken\')"></td>';
         if (config.titleField) html += '<td>' + escapeHtml(t.title) + '</td>';
-        t.metrics.forEach(m => { html += '<td>' + escapeHtml(m.value) + '</td>'; });
+        config.displayFields.forEach(f => { html += '<td>' + escapeHtml(t.metricsMap[f]) + '</td>'; });
         html += '</tr>';
       });
       html += '</tbody></table>';
@@ -362,11 +462,115 @@
       await applyFilterToTargets(value);
     }
 
+    async function persistConfig() {
+      tableau.extensions.settings.set('config', JSON.stringify(config));
+      await tableau.extensions.settings.saveAsync();
+    }
+
+    async function persistColumnWidths() {
+      tableau.extensions.settings.set('columnWidths', JSON.stringify(columnWidths));
+      await tableau.extensions.settings.saveAsync();
+    }
+
+    function startResize(e, field) {
+      const colEl = document.getElementById(fieldColId(field));
+      if (!colEl) return;
+      resizingField = field;
+      const startX = e.clientX;
+      const startWidth = colEl.offsetWidth || colWidth(field);
+      e.target.classList.add('active');
+
+      function onMove(ev) {
+        const w = Math.max(50, startWidth + (ev.clientX - startX));
+        colEl.style.width = w + 'px';
+      }
+      function onUp() {
+        document.removeEventListener('mousemove', onMove);
+        document.removeEventListener('mouseup', onUp);
+        e.target.classList.remove('active');
+        columnWidths[field] = parseInt(colEl.style.width, 10);
+        resizingField = null;
+        persistColumnWidths();
+      }
+      document.addEventListener('mousemove', onMove);
+      document.addEventListener('mouseup', onUp);
+      e.preventDefault();
+    }
+
+    // Mouse-based drag reorder (not native HTML5 drag-and-drop, which behaves
+    // inconsistently for this kind of live-reordering sortable header row).
+    function startHeaderDrag(e, field) {
+      headerDragField = field;
+      let moved = false;
+      const startTh = content.querySelector('th[data-field="' + CSS.escape(field) + '"]');
+      if (startTh) startTh.classList.add('dragging');
+      document.body.style.cursor = 'grabbing';
+
+      function onMove(ev) {
+        const el = document.elementFromPoint(ev.clientX, ev.clientY);
+        const targetTh = el && el.closest && el.closest('th.draggable');
+        if (!targetTh) return;
+        const targetField = targetTh.getAttribute('data-field');
+        if (!targetField || targetField === headerDragField) return;
+        const newOrder = config.displayFields.filter(f => f !== headerDragField);
+        const idx = newOrder.indexOf(targetField);
+        if (idx === -1) return;
+        newOrder.splice(idx, 0, headerDragField);
+        config.displayFields = newOrder;
+        moved = true;
+        renderTable(lastItems);
+        const th2 = content.querySelector('th[data-field="' + CSS.escape(headerDragField) + '"]');
+        if (th2) th2.classList.add('dragging');
+      }
+      function onUp() {
+        document.removeEventListener('mousemove', onMove);
+        document.removeEventListener('mouseup', onUp);
+        document.body.style.cursor = '';
+        content.querySelectorAll('th.dragging').forEach(el => el.classList.remove('dragging'));
+        headerDragField = null;
+        if (moved) persistConfig();
+      }
+      document.addEventListener('mousemove', onMove);
+      document.addEventListener('mouseup', onUp);
+      e.preventDefault();
+    }
+
+    function hideHoverPreview() {
+      hoverPreview.style.display = 'none';
+      lastHoverValue = null;
+    }
+
+    function showHoverPreview(value, x, y) {
+      const item = lastItemsByValue.get(String(value));
+      if (!item) { hideHoverPreview(); return; }
+
+      if (lastHoverValue !== String(value)) {
+        lastHoverValue = String(value);
+        let html = '<img src="' + escapeHtml(item.imageUrl) + '" onerror="this.style.display=\'none\'">';
+        if (config.titleField) html += '<div class="hp-title">' + escapeHtml(item.title) + '</div>';
+        config.displayFields.forEach(f => {
+          html += '<div class="hp-metric"><span class="metric-label">' + escapeHtml(aliasFor(f)) +
+            '</span><span class="metric-value">' + escapeHtml(item.metricsMap[f]) + '</span></div>';
+        });
+        hoverPreview.innerHTML = html;
+      }
+
+      hoverPreview.style.display = 'block';
+      const pad = 16;
+      let left = x + pad;
+      let top = y + pad;
+      const rect = hoverPreview.getBoundingClientRect();
+      if (left + rect.width > window.innerWidth) left = Math.max(4, x - rect.width - pad);
+      if (top + rect.height > window.innerHeight) top = Math.max(4, y - rect.height - pad);
+      hoverPreview.style.left = left + 'px';
+      hoverPreview.style.top = top + 'px';
+    }
+
     async function openConfigure() {
       const payload = JSON.stringify(config);
       try {
         const result = await tableau.extensions.ui.displayDialogAsync(
-          './config.html', payload, { height: 640, width: 500 }
+          './config.html', payload, { height: 700, width: 520 }
         );
         if (!result) return;
         const parsed = JSON.parse(result);
@@ -395,6 +599,20 @@
         const item = e.target.closest('[data-value]');
         if (item) onItemClick(item.getAttribute('data-value'));
       });
+
+      content.addEventListener('mousedown', e => {
+        const handle = e.target.closest('.resize-handle');
+        if (handle) { startResize(e, handle.getAttribute('data-field')); return; }
+        const th = e.target.closest('th.draggable');
+        if (th) startHeaderDrag(e, th.getAttribute('data-field'));
+      });
+
+      content.addEventListener('mousemove', e => {
+        const item = e.target.closest('[data-value]');
+        if (!item) { hideHoverPreview(); return; }
+        showHoverPreview(item.getAttribute('data-value'), e.clientX, e.clientY);
+      });
+      content.addEventListener('mouseleave', hideHoverPreview);
     }
 
     init().catch(e => renderError('Failed to initialize: ' + e.message));
