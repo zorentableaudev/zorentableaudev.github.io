@@ -15,7 +15,11 @@
       padding: 16px;
     }
     h1 { font-size: 15px; margin-bottom: 4px; }
-    p.hint { font-size: 11px; color: #666; margin-bottom: 14px; }
+    h2 {
+      font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .4px;
+      color: #555; margin: 16px 0 6px;
+    }
+    p.hint { font-size: 11px; color: #666; margin-bottom: 4px; }
     label {
       display: block;
       font-size: 11px;
@@ -31,16 +35,75 @@
       border: 1px solid #ccd1d9;
       border-radius: 4px;
       font-size: 13px;
+      font-family: inherit;
     }
     .row { display: flex; gap: 10px; }
     .row > div { flex: 1; }
+
+    .box {
+      border: 1px solid #e2e5e9;
+      border-radius: 5px;
+      max-height: 130px;
+      overflow-y: auto;
+      padding: 6px 8px;
+    }
+    .box label.checkbox {
+      display: flex; align-items: center; gap: 6px;
+      font-size: 12px; font-weight: 400; text-transform: none; letter-spacing: 0;
+      color: #1a1a1a; margin: 4px 0; cursor: pointer;
+    }
+    .box label.checkbox input { width: auto; }
+
+    .add-buttons { display: flex; gap: 8px; margin-top: 8px; }
+    .add-buttons button {
+      flex: 1;
+      padding: 6px 8px;
+      border: 1px dashed #9fb8cc;
+      border-radius: 4px;
+      background: #f7fafd;
+      color: #1e6eb5;
+      font-size: 11px;
+      cursor: pointer;
+    }
+    .add-buttons button:hover { background: #eaf2fb; }
+
+    .order-list { border: 1px solid #e2e5e9; border-radius: 5px; }
+    .order-item {
+      display: flex; align-items: center; gap: 6px;
+      padding: 6px 8px;
+      border-bottom: 1px solid #eef0f3;
+    }
+    .order-item:last-child { border-bottom: none; }
+    .order-item .badge {
+      font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: .3px;
+      padding: 2px 6px; border-radius: 3px;
+    }
+    .badge.source { background: #f0f2f5; color: #555; }
+    .badge.text { background: #eaf2fb; color: #1e6eb5; }
+    .badge.select { background: #eafbf0; color: #1a8a4a; }
+    .order-item .label { flex: 1; font-size: 12px; }
+    .order-item button {
+      background: none; border: 1px solid #ccd1d9; border-radius: 3px;
+      width: 22px; height: 22px; cursor: pointer; font-size: 11px; color: #444;
+    }
+    .order-item button:disabled { opacity: .3; cursor: default; }
+    .order-item button.remove { color: #b3261e; border-color: #e6b8b4; }
+
+    .editor {
+      background: #f9fafb;
+      border-top: 1px dashed #dde1e7;
+      padding: 8px;
+    }
+    .editor .row { margin-bottom: 6px; }
+    .editor .row:last-child { margin-bottom: 0; }
+
     .actions {
       margin-top: 20px;
       display: flex;
       justify-content: flex-end;
       gap: 8px;
     }
-    button {
+    button.primary, button.secondary {
       padding: 8px 16px;
       border-radius: 4px;
       border: 1px solid transparent;
@@ -55,25 +118,28 @@
 </head>
 <body>
   <h1>Row Notes - Configuration</h1>
-  <p class="hint">Pick the worksheet whose rows you want to annotate, the field that uniquely identifies each row, and labels for your two input columns.</p>
+  <p class="hint">Pick the worksheet to annotate and the field that uniquely identifies each row. Then choose which of its columns to show, add your own text/dropdown columns, and put everything in the order you want.</p>
 
   <label for="worksheet">Worksheet (table view)</label>
   <select id="worksheet"></select>
 
   <label for="keyField">Row identifier field</label>
   <select id="keyField"></select>
-  <p class="hint" style="margin-top:4px;">Must be a field that is unique per row (e.g. Campaign ID). Saved notes are keyed to this value, so they survive re-filtering and re-sorting.</p>
+  <p class="hint">Must be unique per row (e.g. Campaign ID). Notes are keyed to this value, so they survive re-filtering and re-sorting.</p>
 
-  <div class="row">
-    <div>
-      <label for="textLabel">Text column label</label>
-      <input type="text" id="textLabel" value="Notes">
-    </div>
-    <div>
-      <label for="flagLabel">Yes/No column label</label>
-      <input type="text" id="flagLabel" value="Reviewed">
-    </div>
+  <h2>Source columns to show</h2>
+  <div class="box" id="sourceChecklist"></div>
+
+  <h2>Your columns</h2>
+  <p class="hint">Add as many as you like — each is either free text or a dropdown with your own options.</p>
+  <div class="add-buttons">
+    <button type="button" id="addText">+ Add text column</button>
+    <button type="button" id="addSelect">+ Add dropdown column</button>
   </div>
+
+  <h2>Column order</h2>
+  <p class="hint">Use the arrows to interleave your columns with the source columns however you like.</p>
+  <div class="order-list" id="orderList"></div>
 
   <div id="error" class="error"></div>
 
@@ -84,34 +150,144 @@
 
   <script>
     let dashboard;
+    let fieldNames = [];
+    let keyField = '';
+    let customColumns = {};   // { [id]: { id, label, type, options? } }
+    let order = [];           // tokens: "src:<field>" | "custom:<id>"
+    let editingId = null;     // custom column id whose inline editor is open
 
-    function showError(msg) {
-      document.getElementById('error').textContent = msg || '';
+    function showError(msg) { document.getElementById('error').textContent = msg || ''; }
+
+    function newId() { return 'c' + Math.random().toString(36).slice(2, 9); }
+
+    function tokenLabel(t) {
+      if (t.startsWith('src:')) return t.slice(4);
+      const def = customColumns[t.slice(7)];
+      return def ? def.label : '(deleted)';
     }
 
-    async function populateKeyFieldOptions() {
-      const wsSelect = document.getElementById('worksheet');
-      const keySelect = document.getElementById('keyField');
-      const wsName = wsSelect.value;
-      keySelect.innerHTML = '<option>Loading columns...</option>';
-      showError('');
+    function renderSourceChecklist() {
+      const box = document.getElementById('sourceChecklist');
+      box.innerHTML = fieldNames.map(f => {
+        const checked = order.includes('src:' + f);
+        return '<label class="checkbox"><input type="checkbox" data-field="' + escapeHtml(f) +
+          '" ' + (checked ? 'checked' : '') + '>' + escapeHtml(f) + '</label>';
+      }).join('') || '<span class="hint">No columns on this worksheet.</span>';
+    }
 
+    function escapeHtml(str) {
+      const d = document.createElement('div');
+      d.textContent = str == null ? '' : String(str);
+      return d.innerHTML;
+    }
+
+    function renderOrderList() {
+      const list = document.getElementById('orderList');
+      if (!order.length) {
+        list.innerHTML = '<div class="order-item"><span class="hint">Nothing selected yet.</span></div>';
+        document.getElementById('saveBtn').disabled = true;
+        return;
+      }
+      document.getElementById('saveBtn').disabled = false;
+
+      list.innerHTML = order.map((t, i) => {
+        const isSrc = t.startsWith('src:');
+        const badge = isSrc ? 'source' : customColumns[t.slice(7)].type;
+        const badgeText = isSrc ? 'source' : customColumns[t.slice(7)].type;
+        let row =
+          '<div class="order-item" data-index="' + i + '">' +
+          '<button type="button" data-action="up" data-index="' + i + '" ' + (i === 0 ? 'disabled' : '') + '>&uarr;</button>' +
+          '<button type="button" data-action="down" data-index="' + i + '" ' + (i === order.length - 1 ? 'disabled' : '') + '>&darr;</button>' +
+          '<span class="badge ' + badge + '">' + badgeText + '</span>' +
+          '<span class="label">' + escapeHtml(tokenLabel(t)) + '</span>';
+        if (!isSrc) {
+          row += '<button type="button" data-action="edit" data-index="' + i + '">Edit</button>';
+          row += '<button type="button" class="remove" data-action="remove" data-index="' + i + '">Remove</button>';
+        } else {
+          row += '<button type="button" class="remove" data-action="remove" data-index="' + i + '">Hide</button>';
+        }
+        row += '</div>';
+
+        if (!isSrc && editingId === t.slice(7)) {
+          const def = customColumns[t.slice(7)];
+          row += '<div class="editor">' +
+            '<div class="row"><input type="text" data-edit="label" data-id="' + def.id +
+            '" value="' + escapeHtml(def.label) + '" placeholder="Column label"></div>';
+          if (def.type === 'select') {
+            row += '<div class="row"><input type="text" data-edit="options" data-id="' + def.id +
+              '" value="' + escapeHtml((def.options || []).join(', ')) +
+              '" placeholder="Options, comma-separated"></div>';
+          }
+          row += '</div>';
+        }
+        return row;
+      }).join('');
+    }
+
+    function addCustomColumn(type) {
+      const id = newId();
+      customColumns[id] = {
+        id, label: type === 'select' ? 'New Dropdown' : 'New Text',
+        type, options: type === 'select' ? ['Option 1', 'Option 2'] : undefined,
+      };
+      order.push('custom:' + id);
+      editingId = id;
+      renderOrderList();
+    }
+
+    function moveToken(index, dir) {
+      const j = index + dir;
+      if (j < 0 || j >= order.length) return;
+      [order[index], order[j]] = [order[j], order[index]];
+      renderOrderList();
+    }
+
+    function removeToken(index) {
+      const t = order[index];
+      order.splice(index, 1);
+      if (t.startsWith('custom:')) delete customColumns[t.slice(7)];
+      if (editingId === t.slice(7)) editingId = null;
+      renderOrderList();
+      if (t.startsWith('src:')) renderSourceChecklist();
+    }
+
+    function renderOrderListLabelOnly() {
+      document.querySelectorAll('.order-item .label').forEach((el, i) => {
+        el.textContent = tokenLabel(order[i]);
+      });
+    }
+
+    async function onWorksheetChange(preserveOrder) {
+      const wsName = document.getElementById('worksheet').value;
       const ws = dashboard.worksheets.find(w => w.name === wsName);
-      if (!ws) { showError('Worksheet not found.'); return; }
+      const keySelect = document.getElementById('keyField');
+      showError('');
+      if (!ws) { fieldNames = []; renderSourceChecklist(); keySelect.innerHTML = ''; renderOrderList(); return; }
 
+      let table;
       try {
-        const table = await ws.getSummaryDataAsync({ ignoreSelection: true, maxRows: 1 });
-        keySelect.innerHTML = '';
-        table.columns.forEach(col => {
-          const opt = document.createElement('option');
-          opt.value = col.fieldName;
-          opt.textContent = col.fieldName;
-          keySelect.appendChild(opt);
-        });
-        document.getElementById('saveBtn').disabled = table.columns.length === 0;
+        table = await ws.getSummaryDataAsync({ ignoreSelection: true, maxRows: 1 });
       } catch (e) {
         showError('Could not read columns from that worksheet: ' + e.message);
+        return;
       }
+      fieldNames = table.columns.map(c => c.fieldName);
+
+      keySelect.innerHTML = fieldNames.map(f => '<option value="' + escapeHtml(f) + '">' + escapeHtml(f) + '</option>').join('');
+      if (keyField && fieldNames.includes(keyField)) keySelect.value = keyField;
+      keyField = keySelect.value; // sync state to whatever the <select> actually shows,
+                                   // since the browser auto-selects the first option without firing 'change'
+
+      if (!preserveOrder) {
+        const customTokens = order.filter(t => t.startsWith('custom:'));
+        order = fieldNames.map(f => 'src:' + f).concat(customTokens);
+      } else {
+        // drop source tokens for fields that no longer exist on this worksheet
+        order = order.filter(t => !t.startsWith('src:') || fieldNames.includes(t.slice(4)));
+      }
+
+      renderSourceChecklist();
+      renderOrderList();
     }
 
     async function init() {
@@ -128,41 +304,73 @@
 
       let existing = null;
       try { existing = openPayload ? JSON.parse(openPayload) : null; } catch (_) {}
-      const settings = tableau.extensions.settings.getAll();
 
-      const savedWorksheet = (existing && existing.worksheet) || settings.configWorksheet;
-      const savedKeyField  = (existing && existing.keyField)  || settings.keyField;
-      const savedTextLabel = (existing && existing.textLabel) || settings.textLabel;
-      const savedFlagLabel = (existing && existing.flagLabel) || settings.flagLabel;
-
-      if (savedWorksheet && dashboard.worksheets.some(w => w.name === savedWorksheet)) {
-        wsSelect.value = savedWorksheet;
+      if (existing && existing.worksheet && dashboard.worksheets.some(w => w.name === existing.worksheet)) {
+        wsSelect.value = existing.worksheet;
       }
-      if (savedTextLabel) document.getElementById('textLabel').value = savedTextLabel;
-      if (savedFlagLabel) document.getElementById('flagLabel').value = savedFlagLabel;
+      keyField = (existing && existing.keyField) || '';
+      customColumns = (existing && existing.customColumns) || {};
+      order = (existing && existing.columnOrder) || [];
 
-      await populateKeyFieldOptions();
-      if (savedKeyField) {
-        const keySelect = document.getElementById('keyField');
-        if ([...keySelect.options].some(o => o.value === savedKeyField)) {
-          keySelect.value = savedKeyField;
+      await onWorksheetChange(!!(existing && existing.columnOrder && existing.columnOrder.length));
+
+      wsSelect.addEventListener('change', () => onWorksheetChange(false));
+
+      document.getElementById('sourceChecklist').addEventListener('change', e => {
+        const field = e.target.getAttribute('data-field');
+        if (field == null) return;
+        const token = 'src:' + field;
+        if (e.target.checked) {
+          if (!order.includes(token)) order.push(token);
+        } else {
+          order = order.filter(t => t !== token);
         }
-      }
+        renderOrderList();
+      });
 
-      wsSelect.addEventListener('change', populateKeyFieldOptions);
+      document.getElementById('addText').addEventListener('click', () => addCustomColumn('text'));
+      document.getElementById('addSelect').addEventListener('click', () => addCustomColumn('select'));
+
+      document.getElementById('orderList').addEventListener('click', e => {
+        const action = e.target.getAttribute('data-action');
+        if (!action) return;
+        const index = parseInt(e.target.getAttribute('data-index'), 10);
+        if (action === 'up') moveToken(index, -1);
+        else if (action === 'down') moveToken(index, 1);
+        else if (action === 'remove') removeToken(index);
+        else if (action === 'edit') {
+          const t = order[index];
+          editingId = (editingId === t.slice(7)) ? null : t.slice(7);
+          renderOrderList();
+        }
+      });
+
+      document.getElementById('orderList').addEventListener('input', e => {
+        const field = e.target.getAttribute('data-edit');
+        const id = e.target.getAttribute('data-id');
+        if (!field || !customColumns[id]) return;
+        if (field === 'label') {
+          customColumns[id].label = e.target.value;
+          renderOrderListLabelOnly();
+        } else if (field === 'options') {
+          customColumns[id].options = e.target.value.split(',').map(s => s.trim()).filter(Boolean);
+        }
+      });
+
+      document.getElementById('keyField').addEventListener('change', e => { keyField = e.target.value; });
 
       document.getElementById('saveBtn').addEventListener('click', () => {
-        const payload = {
-          worksheet:  wsSelect.value,
-          keyField:   document.getElementById('keyField').value,
-          textLabel:  document.getElementById('textLabel').value.trim() || 'Notes',
-          flagLabel:  document.getElementById('flagLabel').value.trim() || 'Reviewed',
-        };
-        if (!payload.worksheet || !payload.keyField) {
-          showError('Choose a worksheet and a row identifier field.');
+        const wsName = document.getElementById('worksheet').value;
+        if (!wsName || !keyField || !order.length) {
+          showError('Choose a worksheet, a row identifier field, and at least one column.');
           return;
         }
-        tableau.extensions.ui.closeDialog(JSON.stringify(payload));
+        tableau.extensions.ui.closeDialog(JSON.stringify({
+          worksheet: wsName,
+          keyField,
+          columnOrder: order,
+          customColumns,
+        }));
       });
 
       document.getElementById('cancelBtn').addEventListener('click', () => {

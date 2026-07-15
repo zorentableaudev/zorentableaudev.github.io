@@ -42,46 +42,65 @@
 
     .content { flex: 1; overflow: auto; }
 
-    table { border-collapse: collapse; width: 100%; }
+    .warning {
+      background: #fff6e5;
+      color: #8a5a00;
+      font-size: 11px;
+      padding: 6px 10px;
+      border-bottom: 1px solid #f0ddb0;
+    }
+
+    table { border-collapse: collapse; width: 100%; table-layout: fixed; }
     thead th {
       position: sticky; top: 0; z-index: 1;
       background: #f6f7f9;
       border-bottom: 1px solid #dde1e7;
       text-align: left;
-      padding: 6px 8px;
+      padding: 6px 10px 6px 8px;
       font-size: 10px;
       font-weight: 700;
       text-transform: uppercase;
       letter-spacing: .3px;
       color: #555;
       white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
     }
     thead th.new-col { background: #eaf2fb; color: #1e6eb5; }
+    .resize-handle {
+      position: absolute;
+      right: -3px;
+      top: 0;
+      width: 6px;
+      height: 100%;
+      cursor: col-resize;
+      z-index: 2;
+    }
+    .resize-handle:hover, .resize-handle.active { background: rgba(30,110,181,.4); }
     tbody td {
       padding: 4px 8px;
       border-bottom: 1px solid #eef0f3;
       white-space: nowrap;
-      max-width: 220px;
       overflow: hidden;
       text-overflow: ellipsis;
     }
     tbody tr:hover td { background: #fafbfc; }
-    input[type=text].note-input {
+    input[type=text].cell-input {
       width: 100%;
-      min-width: 140px;
       padding: 4px 6px;
       border: 1px solid #ccd1d9;
       border-radius: 3px;
       font-size: 12px;
+      font-family: inherit;
     }
-    input[type=text].note-input:focus { border-color: #1e6eb5; outline: none; }
-    select.flag-select {
+    input[type=text].cell-input:focus { border-color: #1e6eb5; outline: none; }
+    select.cell-select {
       width: 100%;
-      min-width: 80px;
       padding: 4px 6px;
       border: 1px solid #ccd1d9;
       border-radius: 3px;
       font-size: 12px;
+      font-family: inherit;
       background: #fff;
     }
     td.new-col { background: #f9fcff; }
@@ -118,39 +137,23 @@
 
   <script>
     let dashboard;
-    let config = {};      // { worksheet, keyField, textLabel, flagLabel }
-    let rowData = {};     // { [keyValue]: { text, flag } }
-    let columns = [];     // current worksheet's summary columns (fieldName list, in order)
+    let boundWs = null;
+    let resizingToken = null;
+    let lastConfigRaw = '';
+
+    // config.columnOrder: array of tokens, each "src:<fieldName>" or "custom:<id>"
+    // config.customColumns: { [id]: { id, label, type: 'text'|'select', options?: string[] } }
+    let config = { worksheet: '', keyField: '', columnOrder: [], customColumns: {} };
+    let columnWidths = {};   // { [token]: pixelWidth }
+    let rowData = {};        // { [rowKey]: { [customColumnId]: value } }
+
     let saveTimer = null;
-    const dirtyKeys = new Set(); // keys with an unsaved local edit in flight
+    const dirtyCells = new Set(); // "rowKey::colId" tags with an unsaved local edit in flight
+
+    const content = document.getElementById('content');
 
     function setStatus(text) {
       document.getElementById('status').textContent = text || '';
-    }
-
-    function loadConfig() {
-      const s = tableau.extensions.settings.getAll();
-      config = {
-        worksheet:  s.configWorksheet || '',
-        keyField:   s.keyField || '',
-        textLabel:  s.textLabel || 'Notes',
-        flagLabel:  s.flagLabel || 'Reviewed',
-      };
-      try { rowData = s.rowData ? JSON.parse(s.rowData) : {}; }
-      catch (_) { rowData = {}; }
-    }
-
-    function renderUnconfigured(message) {
-      document.getElementById('content').innerHTML =
-        '<div class="empty-state">' +
-        (message || 'This extension has not been configured yet.') +
-        '<br><button id="configureNow">Configure</button></div>';
-      document.getElementById('configureNow').addEventListener('click', openConfigure);
-    }
-
-    function renderError(message) {
-      document.getElementById('content').innerHTML =
-        '<div class="error-state">' + escapeHtml(message) + '</div>';
     }
 
     function escapeHtml(str) {
@@ -159,11 +162,71 @@
       return d.innerHTML;
     }
 
-    async function loadAndRender() {
-      if (!config.worksheet || !config.keyField) {
-        renderUnconfigured();
-        return;
+    function tokenId(token) {
+      return 'col_' + token.replace(/[^a-zA-Z0-9]/g, '_');
+    }
+
+    function colLabel(token) {
+      if (token.startsWith('src:')) return token.slice(4);
+      const def = config.customColumns[token.slice(7)];
+      return def ? def.label : token;
+    }
+
+    function colWidth(token) {
+      if (columnWidths[token] != null) return columnWidths[token];
+      if (token.startsWith('src:')) return 140;
+      const def = config.customColumns[token.slice(7)];
+      return def && def.type === 'select' ? 110 : 160;
+    }
+
+    function isConfigured() {
+      return !!(config.worksheet && config.keyField && config.columnOrder.length);
+    }
+
+    function loadConfig() {
+      const s = tableau.extensions.settings.getAll();
+      lastConfigRaw = s.config || '';
+      let parsed = {};
+      try { parsed = s.config ? JSON.parse(s.config) : {}; } catch (_) { parsed = {}; }
+      config = {
+        worksheet: parsed.worksheet || '',
+        keyField: parsed.keyField || '',
+        columnOrder: Array.isArray(parsed.columnOrder) ? parsed.columnOrder : [],
+        customColumns: (parsed.customColumns && typeof parsed.customColumns === 'object') ? parsed.customColumns : {},
+      };
+      try { columnWidths = s.columnWidths ? JSON.parse(s.columnWidths) : {}; } catch (_) { columnWidths = {}; }
+      try { rowData = s.rowData ? JSON.parse(s.rowData) : {}; } catch (_) { rowData = {}; }
+    }
+
+    function renderUnconfigured(message) {
+      content.innerHTML =
+        '<div class="empty-state">' +
+        escapeHtml(message || 'This extension has not been configured yet.') +
+        '<br><button id="configureNow">Configure</button></div>';
+      document.getElementById('configureNow').addEventListener('click', openConfigure);
+    }
+
+    function renderError(message) {
+      content.innerHTML = '<div class="error-state">' + escapeHtml(message) + '</div>';
+    }
+
+    function bindWorksheetEvents() {
+      if (boundWs) {
+        boundWs.removeEventListener(tableau.TableauEventType.FilterChanged, loadAndRender);
+        boundWs.removeEventListener(tableau.TableauEventType.SummaryDataChanged, loadAndRender);
+        boundWs = null;
       }
+      if (!config.worksheet) return;
+      const ws = dashboard.worksheets.find(w => w.name === config.worksheet);
+      if (!ws) return;
+      ws.addEventListener(tableau.TableauEventType.FilterChanged, loadAndRender);
+      ws.addEventListener(tableau.TableauEventType.SummaryDataChanged, loadAndRender);
+      boundWs = ws;
+    }
+
+    async function loadAndRender() {
+      if (!isConfigured()) { renderUnconfigured(); return; }
+
       const ws = dashboard.worksheets.find(w => w.name === config.worksheet);
       if (!ws) {
         renderUnconfigured('Configured worksheet "' + config.worksheet + '" was not found on this dashboard. It may have been renamed or removed.');
@@ -178,8 +241,8 @@
         return;
       }
 
-      columns = table.columns.map(c => c.fieldName);
-      const keyIdx = columns.indexOf(config.keyField);
+      const fieldNames = table.columns.map(c => c.fieldName);
+      const keyIdx = fieldNames.indexOf(config.keyField);
       if (keyIdx === -1) {
         renderUnconfigured('Configured row identifier field "' + config.keyField + '" is no longer available on "' + config.worksheet + '".');
         return;
@@ -188,61 +251,84 @@
       document.getElementById('title').textContent = 'Row Notes — ' + config.worksheet;
 
       if (table.totalRowCount === 0) {
-        document.getElementById('content').innerHTML =
-          '<div class="empty-state">No rows to show (check filters on "' + config.worksheet + '").</div>';
+        content.innerHTML = '<div class="empty-state">No rows to show (check filters on "' + config.worksheet + '").</div>';
         return;
       }
 
+      const missingSource = [];
+      const tokens = config.columnOrder.filter(t => {
+        if (t.startsWith('src:')) {
+          const ok = fieldNames.includes(t.slice(4));
+          if (!ok) missingSource.push(t.slice(4));
+          return ok;
+        }
+        return !!config.customColumns[t.slice(7)];
+      });
+
       const rows = table.data.map(r => r.map(cell => cell.formattedValue));
-      renderTable(rows, keyIdx);
+      renderTable(rows, keyIdx, fieldNames, tokens, missingSource);
     }
 
-    function renderTable(rows, keyIdx) {
+    function renderTable(rows, keyIdx, fieldNames, tokens, missingSource) {
       const seenKeys = new Set();
-      let html = '<table><thead><tr>';
-      columns.forEach(c => { html += '<th>' + escapeHtml(c) + '</th>'; });
-      html += '<th class="new-col">' + escapeHtml(config.textLabel) + '</th>';
-      html += '<th class="new-col">' + escapeHtml(config.flagLabel) + '</th>';
+
+      let html = '';
+      if (missingSource.length) {
+        html += '<div class="warning">Hidden — no longer on this worksheet: ' +
+          missingSource.map(escapeHtml).join(', ') + '</div>';
+      }
+
+      html += '<table><colgroup>' +
+        tokens.map(t => '<col id="' + tokenId(t) + '" style="width:' + colWidth(t) + 'px">').join('') +
+        '</colgroup><thead><tr>';
+      tokens.forEach(t => {
+        const cls = t.startsWith('custom:') ? ' class="new-col"' : '';
+        html += '<th' + cls + '>' + escapeHtml(colLabel(t)) +
+          '<div class="resize-handle" data-token="' + t + '"></div></th>';
+      });
       html += '</tr></thead><tbody>';
 
-      rows.forEach((cells, rowIdx) => {
+      rows.forEach(cells => {
         const key = cells[keyIdx];
         if (seenKeys.has(key)) return; // guard against a non-unique key field
         seenKeys.add(key);
-        const saved = rowData[key] || { text: '', flag: '' };
+        const savedRow = rowData[key] || {};
 
         html += '<tr data-key="' + escapeHtml(key) + '">';
-        cells.forEach(v => { html += '<td>' + escapeHtml(v) + '</td>'; });
-        html += '<td class="new-col"><input type="text" class="note-input" data-row-key="' +
-          escapeHtml(key) + '" value="' + escapeHtml(saved.text) + '"></td>';
-        html += '<td class="new-col"><select class="flag-select" data-row-key="' + escapeHtml(key) + '">' +
-          ['', 'Yes', 'No'].map(opt =>
-            '<option value="' + opt + '"' + (saved.flag === opt ? ' selected' : '') + '>' +
-            (opt || '—') + '</option>'
-          ).join('') +
-          '</select></td>';
+        tokens.forEach(t => {
+          if (t.startsWith('src:')) {
+            const idx = fieldNames.indexOf(t.slice(4));
+            html += '<td>' + escapeHtml(cells[idx]) + '</td>';
+            return;
+          }
+          const id = t.slice(7);
+          const def = config.customColumns[id];
+          const val = savedRow[id] || '';
+          if (def.type === 'select') {
+            const opts = def.options || [];
+            html += '<td class="new-col"><select class="cell-select" data-row-key="' + escapeHtml(key) +
+              '" data-col-id="' + id + '"><option value=""' + (val === '' ? ' selected' : '') + '>—</option>' +
+              opts.map(o => '<option value="' + escapeHtml(o) + '"' + (val === o ? ' selected' : '') + '>' +
+                escapeHtml(o) + '</option>').join('') +
+              '</select></td>';
+          } else {
+            html += '<td class="new-col"><input type="text" class="cell-input" data-row-key="' + escapeHtml(key) +
+              '" data-col-id="' + id + '" value="' + escapeHtml(val) + '"></td>';
+          }
+        });
         html += '</tr>';
       });
       html += '</tbody></table>';
 
-      document.getElementById('content').innerHTML = html;
-
-      document.querySelectorAll('.note-input').forEach(el => {
-        el.addEventListener('input', onEdit);
-      });
-      document.querySelectorAll('.flag-select').forEach(el => {
-        el.addEventListener('change', onEdit);
-      });
+      content.innerHTML = html;
     }
 
     function onEdit(e) {
       const key = e.target.getAttribute('data-row-key');
-      const row = document.querySelector('tr[data-key="' + CSS.escape(key) + '"]');
-      const text = row.querySelector('.note-input').value;
-      const flag = row.querySelector('.flag-select').value;
-
-      rowData[key] = { text, flag };
-      dirtyKeys.add(key);
+      const colId = e.target.getAttribute('data-col-id');
+      if (!rowData[key]) rowData[key] = {};
+      rowData[key][colId] = e.target.value;
+      dirtyCells.add(key + '::' + colId);
       scheduleSave();
     }
 
@@ -256,8 +342,9 @@
       setStatus('Saving...');
       try {
         tableau.extensions.settings.set('rowData', JSON.stringify(rowData));
+        tableau.extensions.settings.set('columnWidths', JSON.stringify(columnWidths));
         await tableau.extensions.settings.saveAsync();
-        dirtyKeys.clear();
+        dirtyCells.clear();
         setStatus('Saved');
         setTimeout(() => setStatus(''), 1500);
       } catch (e) {
@@ -265,45 +352,100 @@
       }
     }
 
-    // Merge in settings saved by another session without clobbering this
-    // user's in-flight (unsaved) edits or whatever field they're actively typing in.
-    function onSettingsChanged() {
-      const s = tableau.extensions.settings.getAll();
+    function mergeIncomingRowData(s) {
       let incoming = {};
-      try { incoming = s.rowData ? JSON.parse(s.rowData) : {}; }
-      catch (_) { return; }
+      try { incoming = s.rowData ? JSON.parse(s.rowData) : {}; } catch (_) { return; }
 
       const active = document.activeElement;
       const activeKey = active && active.getAttribute && active.getAttribute('data-row-key');
+      const activeColId = active && active.getAttribute && active.getAttribute('data-col-id');
 
       Object.keys(incoming).forEach(key => {
-        if (dirtyKeys.has(key)) return;
-        rowData[key] = incoming[key];
-        if (key === activeKey) return;
-        const row = document.querySelector('tr[data-key="' + CSS.escape(key) + '"]');
-        if (!row) return;
-        row.querySelector('.note-input').value = incoming[key].text || '';
-        row.querySelector('.flag-select').value = incoming[key].flag || '';
+        const incomingCols = incoming[key] || {};
+        Object.keys(incomingCols).forEach(colId => {
+          if (dirtyCells.has(key + '::' + colId)) return;
+          if (!rowData[key]) rowData[key] = {};
+          rowData[key][colId] = incomingCols[colId];
+          if (key === activeKey && colId === activeColId) return;
+          const el = content.querySelector(
+            '[data-row-key="' + CSS.escape(key) + '"][data-col-id="' + CSS.escape(colId) + '"]'
+          );
+          if (el) el.value = incomingCols[colId] || '';
+        });
       });
+    }
+
+    function mergeIncomingColumnWidths(s) {
+      let incoming = {};
+      try { incoming = s.columnWidths ? JSON.parse(s.columnWidths) : {}; } catch (_) { return; }
+      Object.keys(incoming).forEach(token => {
+        if (resizingToken === token) return; // don't fight an active local drag
+        columnWidths[token] = incoming[token];
+        const colEl = document.getElementById(tokenId(token));
+        if (colEl) colEl.style.width = incoming[token] + 'px';
+      });
+    }
+
+    function onSettingsChanged() {
+      const s = tableau.extensions.settings.getAll();
+      const incomingConfigRaw = s.config || '';
+      if (incomingConfigRaw !== lastConfigRaw) {
+        loadConfig();
+        bindWorksheetEvents();
+        loadAndRender();
+        return;
+      }
+      mergeIncomingRowData(s);
+      mergeIncomingColumnWidths(s);
+    }
+
+    function startResize(e, token) {
+      const colEl = document.getElementById(tokenId(token));
+      if (!colEl) return;
+      resizingToken = token;
+      const startX = e.clientX;
+      const startWidth = colEl.offsetWidth || colWidth(token);
+      e.target.classList.add('active');
+
+      function onMove(ev) {
+        const w = Math.max(50, startWidth + (ev.clientX - startX));
+        colEl.style.width = w + 'px';
+      }
+      function onUp() {
+        document.removeEventListener('mousemove', onMove);
+        document.removeEventListener('mouseup', onUp);
+        e.target.classList.remove('active');
+        columnWidths[token] = parseInt(colEl.style.width, 10);
+        resizingToken = null;
+        scheduleSave();
+      }
+      document.addEventListener('mousemove', onMove);
+      document.addEventListener('mouseup', onUp);
+      e.preventDefault();
     }
 
     async function openConfigure() {
       const payload = JSON.stringify({
-        worksheet: config.worksheet, keyField: config.keyField,
-        textLabel: config.textLabel, flagLabel: config.flagLabel,
+        worksheet: config.worksheet,
+        keyField: config.keyField,
+        columnOrder: config.columnOrder,
+        customColumns: config.customColumns,
       });
       try {
         const result = await tableau.extensions.ui.displayDialogAsync(
-          './config.html', payload, { height: 480, width: 440 }
+          './config.html', payload, { height: 620, width: 560 }
         );
         if (!result) return;
         const parsed = JSON.parse(result);
-        tableau.extensions.settings.set('configWorksheet', parsed.worksheet);
-        tableau.extensions.settings.set('keyField', parsed.keyField);
-        tableau.extensions.settings.set('textLabel', parsed.textLabel);
-        tableau.extensions.settings.set('flagLabel', parsed.flagLabel);
+        tableau.extensions.settings.set('config', JSON.stringify({
+          worksheet: parsed.worksheet,
+          keyField: parsed.keyField,
+          columnOrder: parsed.columnOrder,
+          customColumns: parsed.customColumns,
+        }));
         await tableau.extensions.settings.saveAsync();
         loadConfig();
+        bindWorksheetEvents();
         await loadAndRender();
       } catch (e) {
         // user cancelled the dialog - ErrorCodes.DialogClosedByUser - nothing to do
@@ -314,6 +456,7 @@
       await tableau.extensions.initializeAsync({ configure: openConfigure });
       dashboard = tableau.extensions.dashboardContent.dashboard;
       loadConfig();
+      bindWorksheetEvents();
       await loadAndRender();
 
       document.getElementById('configureBtn').addEventListener('click', openConfigure);
@@ -321,13 +464,16 @@
         tableau.TableauEventType.SettingsChanged, onSettingsChanged
       );
 
-      if (config.worksheet) {
-        const ws = dashboard.worksheets.find(w => w.name === config.worksheet);
-        if (ws) {
-          ws.addEventListener(tableau.TableauEventType.FilterChanged, loadAndRender);
-          ws.addEventListener(tableau.TableauEventType.SummaryDataChanged, loadAndRender);
-        }
-      }
+      content.addEventListener('input', e => {
+        if (e.target.classList.contains('cell-input')) onEdit(e);
+      });
+      content.addEventListener('change', e => {
+        if (e.target.classList.contains('cell-select')) onEdit(e);
+      });
+      content.addEventListener('mousedown', e => {
+        const handle = e.target.closest('.resize-handle');
+        if (handle) startResize(e, handle.getAttribute('data-token'));
+      });
     }
 
     init().catch(e => renderError('Failed to initialize: ' + e.message));
