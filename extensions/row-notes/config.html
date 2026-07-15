@@ -148,7 +148,7 @@
   </div>
 
   <h2>Column order</h2>
-  <p class="hint">Use the arrows to interleave your columns with the source columns however you like.</p>
+  <p class="hint">Use the arrows to interleave your columns with the source columns however you like. Edit lets you rename any column's display label, including source columns.</p>
   <div class="order-list" id="orderList"></div>
 
   <div id="error" class="error"></div>
@@ -163,8 +163,9 @@
     let fieldNames = [];
     let keyField = '';
     let customColumns = {};   // { [id]: { id, label, type, options? } }
+    let sourceAliases = {};   // { [fieldName]: displayLabel } - overrides for source columns
     let order = [];           // tokens: "src:<field>" | "custom:<id>"
-    let editingId = null;     // custom column id whose inline editor is open
+    let editingToken = null;  // full token ("src:<field>" or "custom:<id>") whose inline editor is open
 
     const DEFAULT_PALETTE = [
       '#f8d7da', '#fff3cd', '#d4edda', '#d1ecf1',
@@ -201,7 +202,10 @@
     }
 
     function tokenLabel(t) {
-      if (t.startsWith('src:')) return t.slice(4);
+      if (t.startsWith('src:')) {
+        const field = t.slice(4);
+        return sourceAliases[field] || field;
+      }
       const def = customColumns[t.slice(7)];
       return def ? def.label : '(deleted)';
     }
@@ -239,27 +243,34 @@
           '<button type="button" data-action="up" data-index="' + i + '" ' + (i === 0 ? 'disabled' : '') + '>&uarr;</button>' +
           '<button type="button" data-action="down" data-index="' + i + '" ' + (i === order.length - 1 ? 'disabled' : '') + '>&darr;</button>' +
           '<span class="badge ' + badge + '">' + badgeText + '</span>' +
-          '<span class="label">' + escapeHtml(tokenLabel(t)) + '</span>';
+          '<span class="label">' + escapeHtml(tokenLabel(t)) + '</span>' +
+          '<button type="button" data-action="edit" data-index="' + i + '">Edit</button>';
         if (!isSrc) {
-          row += '<button type="button" data-action="edit" data-index="' + i + '">Edit</button>';
           row += '<button type="button" class="remove" data-action="remove" data-index="' + i + '">Remove</button>';
         } else {
           row += '<button type="button" class="remove" data-action="remove" data-index="' + i + '">Hide</button>';
         }
         row += '</div>';
 
-        if (!isSrc && editingId === t.slice(7)) {
-          const def = customColumns[t.slice(7)];
-          row += '<div class="editor">' +
-            '<div class="row"><input type="text" data-edit="label" data-id="' + def.id +
-            '" value="' + escapeHtml(def.label) + '" placeholder="Column label"></div>';
-          if (def.type === 'select') {
-            row += '<div class="row"><input type="text" data-edit="options" data-id="' + def.id +
-              '" value="' + escapeHtml((def.options || []).join(', ')) +
-              '" placeholder="Options, comma-separated"></div>';
-            row += renderOptionColorRows(def);
+        if (editingToken === t) {
+          if (isSrc) {
+            const field = t.slice(4);
+            row += '<div class="editor"><div class="row"><input type="text" data-edit="alias" data-field="' +
+              escapeHtml(field) + '" value="' + escapeHtml(sourceAliases[field] || field) +
+              '" placeholder="Display label"></div></div>';
+          } else {
+            const def = customColumns[t.slice(7)];
+            row += '<div class="editor">' +
+              '<div class="row"><input type="text" data-edit="label" data-id="' + def.id +
+              '" value="' + escapeHtml(def.label) + '" placeholder="Column label"></div>';
+            if (def.type === 'select') {
+              row += '<div class="row"><input type="text" data-edit="options" data-id="' + def.id +
+                '" value="' + escapeHtml((def.options || []).join(', ')) +
+                '" placeholder="Options, comma-separated"></div>';
+              row += renderOptionColorRows(def);
+            }
+            row += '</div>';
           }
-          row += '</div>';
         }
         return row;
       }).join('');
@@ -273,7 +284,7 @@
       };
       ensureOptionColors(customColumns[id]);
       order.push('custom:' + id);
-      editingId = id;
+      editingToken = 'custom:' + id;
       renderOrderList();
     }
 
@@ -288,7 +299,7 @@
       const t = order[index];
       order.splice(index, 1);
       if (t.startsWith('custom:')) delete customColumns[t.slice(7)];
-      if (editingId === t.slice(7)) editingId = null;
+      if (editingToken === t) editingToken = null;
       renderOrderList();
       if (t.startsWith('src:')) renderSourceChecklist();
     }
@@ -352,6 +363,7 @@
       }
       keyField = (existing && existing.keyField) || '';
       customColumns = (existing && existing.customColumns) || {};
+      sourceAliases = (existing && existing.sourceAliases) || {};
       order = (existing && existing.columnOrder) || [];
       Object.values(customColumns).forEach(ensureOptionColors);
 
@@ -383,7 +395,7 @@
         else if (action === 'remove') removeToken(index);
         else if (action === 'edit') {
           const t = order[index];
-          editingId = (editingId === t.slice(7)) ? null : t.slice(7);
+          editingToken = (editingToken === t) ? null : t;
           renderOrderList();
         }
       });
@@ -400,6 +412,15 @@
         }
 
         const field = e.target.getAttribute('data-edit');
+        if (field === 'alias') {
+          const fieldName = e.target.getAttribute('data-field');
+          const val = e.target.value;
+          if (val.trim() && val.trim() !== fieldName) sourceAliases[fieldName] = val;
+          else delete sourceAliases[fieldName];
+          renderOrderListLabelOnly();
+          return;
+        }
+
         const id = e.target.getAttribute('data-id');
         if (!field || !customColumns[id]) return;
         if (field === 'label') {
@@ -426,6 +447,7 @@
           keyField,
           columnOrder: order,
           customColumns,
+          sourceAliases,
         }));
       });
 

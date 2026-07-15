@@ -143,7 +143,8 @@
 
     // config.columnOrder: array of tokens, each "src:<fieldName>" or "custom:<id>"
     // config.customColumns: { [id]: { id, label, type: 'text'|'select', options?: string[], optionColors?: { [option]: hex } } }
-    let config = { worksheet: '', keyField: '', columnOrder: [], customColumns: {} };
+    // config.sourceAliases: { [sourceFieldName]: displayLabel }
+    let config = { worksheet: '', keyField: '', columnOrder: [], customColumns: {}, sourceAliases: {} };
     let columnWidths = {};   // { [token]: pixelWidth }
     let rowData = {};        // { [rowKey]: { [customColumnId]: value } }
 
@@ -167,7 +168,10 @@
     }
 
     function colLabel(token) {
-      if (token.startsWith('src:')) return token.slice(4);
+      if (token.startsWith('src:')) {
+        const field = token.slice(4);
+        return (config.sourceAliases && config.sourceAliases[field]) || field;
+      }
       const def = config.customColumns[token.slice(7)];
       return def ? def.label : token;
     }
@@ -197,6 +201,7 @@
         keyField: parsed.keyField || '',
         columnOrder: Array.isArray(parsed.columnOrder) ? parsed.columnOrder : [],
         customColumns: (parsed.customColumns && typeof parsed.customColumns === 'object') ? parsed.customColumns : {},
+        sourceAliases: (parsed.sourceAliases && typeof parsed.sourceAliases === 'object') ? parsed.sourceAliases : {},
       };
       try { columnWidths = s.columnWidths ? JSON.parse(s.columnWidths) : {}; } catch (_) { columnWidths = {}; }
       try { rowData = s.rowData ? JSON.parse(s.rowData) : {}; } catch (_) { rowData = {}; }
@@ -446,6 +451,7 @@
         keyField: config.keyField,
         columnOrder: config.columnOrder,
         customColumns: config.customColumns,
+        sourceAliases: config.sourceAliases,
       });
       try {
         const result = await tableau.extensions.ui.displayDialogAsync(
@@ -458,6 +464,7 @@
           keyField: parsed.keyField,
           columnOrder: parsed.columnOrder,
           customColumns: parsed.customColumns,
+          sourceAliases: parsed.sourceAliases,
         }));
         await tableau.extensions.settings.saveAsync();
         loadConfig();
