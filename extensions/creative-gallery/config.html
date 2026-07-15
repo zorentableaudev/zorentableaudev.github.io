@@ -1,0 +1,361 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Creative Gallery - Configure</title>
+  <script src="./tableau.extensions.1.latest.min.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      font-size: 13px;
+      color: #1a1a1a;
+      background: #fff;
+      padding: 16px;
+    }
+    h1 { font-size: 15px; margin-bottom: 4px; }
+    h2 {
+      font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .4px;
+      color: #555; margin: 16px 0 6px;
+    }
+    p.hint { font-size: 11px; color: #666; margin-bottom: 4px; }
+    label {
+      display: block;
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: .4px;
+      color: #555;
+      margin: 12px 0 4px;
+    }
+    select, input[type=text], input[type=number] {
+      width: 100%;
+      padding: 7px 8px;
+      border: 1px solid #ccd1d9;
+      border-radius: 4px;
+      font-size: 13px;
+      font-family: inherit;
+    }
+    .row { display: flex; gap: 10px; }
+    .row > div { flex: 1; }
+
+    .box {
+      border: 1px solid #e2e5e9;
+      border-radius: 5px;
+      max-height: 140px;
+      overflow-y: auto;
+      padding: 6px 8px;
+    }
+    .box label.checkbox {
+      display: flex; align-items: center; gap: 6px;
+      font-size: 12px; font-weight: 400; text-transform: none; letter-spacing: 0;
+      color: #1a1a1a; margin: 4px 0; cursor: pointer;
+    }
+    .box label.checkbox input { width: auto; }
+
+    .order-list { border: 1px solid #e2e5e9; border-radius: 5px; }
+    .order-item {
+      display: flex; align-items: center; gap: 6px;
+      padding: 6px 8px;
+      border-bottom: 1px solid #eef0f3;
+      font-size: 12px;
+    }
+    .order-item:last-child { border-bottom: none; }
+    .order-item .label { flex: 1; }
+    .order-item button {
+      background: none; border: 1px solid #ccd1d9; border-radius: 3px;
+      width: 22px; height: 22px; cursor: pointer; font-size: 11px; color: #444;
+    }
+    .order-item button:disabled { opacity: .3; cursor: default; }
+
+    .actions {
+      margin-top: 20px;
+      display: flex;
+      justify-content: flex-end;
+      gap: 8px;
+    }
+    button.primary, button.secondary {
+      padding: 8px 16px;
+      border-radius: 4px;
+      border: 1px solid transparent;
+      font-size: 13px;
+      cursor: pointer;
+    }
+    button.primary { background: #1e6eb5; color: #fff; }
+    button.primary:disabled { background: #a9c6e2; cursor: not-allowed; }
+    button.secondary { background: #f0f2f5; color: #333; border-color: #ccd1d9; }
+    .error { color: #b3261e; font-size: 11px; margin-top: 10px; }
+  </style>
+</head>
+<body>
+  <h1>Creative Gallery - Configuration</h1>
+  <p class="hint">Pick the worksheet that has one row per creative, which field holds the image URL, and which field ties a creative to the sheets you want it to filter.</p>
+
+  <label for="extTitle">Extension title (optional)</label>
+  <input type="text" id="extTitle" placeholder='Defaults to "Creative Gallery — &lt;worksheet name&gt;"'>
+
+  <label for="worksheet">Source worksheet (has the image URLs)</label>
+  <select id="worksheet"></select>
+
+  <div class="row">
+    <div>
+      <label for="imageField">Image URL field</label>
+      <select id="imageField"></select>
+    </div>
+    <div>
+      <label for="titleField">Title field (optional)</label>
+      <select id="titleField"></select>
+    </div>
+  </div>
+
+  <label for="filterField">Filter field</label>
+  <select id="filterField"></select>
+  <p class="hint">The value passed to target sheets when a creative is clicked. Must exist as a field on those sheets too (e.g. Creative Name or Creative ID).</p>
+
+  <div class="row">
+    <div>
+      <label for="layout">Layout</label>
+      <select id="layout">
+        <option value="card">Card grid</option>
+        <option value="table">Table</option>
+      </select>
+    </div>
+    <div id="columnsWrap">
+      <label for="columns">Tiles per row</label>
+      <input type="number" id="columns" min="2" max="8" value="4">
+    </div>
+  </div>
+
+  <h2>Metrics &amp; dimensions to show</h2>
+  <p class="hint">Everything else from the source worksheet you want displayed alongside each image.</p>
+  <div class="box" id="fieldChecklist"></div>
+
+  <h2>Display order</h2>
+  <div class="order-list" id="orderList"></div>
+
+  <h2>Sheets to filter when a creative is clicked</h2>
+  <div class="box" id="targetChecklist"></div>
+
+  <div id="error" class="error"></div>
+
+  <div class="actions">
+    <button class="secondary" id="cancelBtn">Cancel</button>
+    <button class="primary" id="saveBtn" disabled>Save</button>
+  </div>
+
+  <script>
+    let dashboard;
+    let fieldNames = [];
+    let title = '';
+    let imageField = '';
+    let titleField = '';
+    let filterField = '';
+    let layout = 'card';
+    let columns = 4;
+    let displayFields = [];
+    let targetWorksheets = [];
+
+    function showError(msg) { document.getElementById('error').textContent = msg || ''; }
+
+    function escapeHtml(str) {
+      const d = document.createElement('div');
+      d.textContent = str == null ? '' : String(str);
+      return d.innerHTML;
+    }
+
+    function fillSelect(sel, options, current) {
+      sel.innerHTML = options.map(f => '<option value="' + escapeHtml(f) + '">' + escapeHtml(f) + '</option>').join('');
+      if (current && options.includes(current)) sel.value = current;
+    }
+
+    function renderTargetChecklist() {
+      const box = document.getElementById('targetChecklist');
+      const wsName = document.getElementById('worksheet').value;
+      const candidates = dashboard.worksheets.filter(w => w.name !== wsName);
+      box.innerHTML = candidates.map(w => {
+        const checked = targetWorksheets.includes(w.name);
+        return '<label class="checkbox"><input type="checkbox" data-name="' + escapeHtml(w.name) +
+          '" ' + (checked ? 'checked' : '') + '>' + escapeHtml(w.name) + '</label>';
+      }).join('') || '<span class="hint">No other sheets on this dashboard.</span>';
+    }
+
+    function renderFieldChecklist() {
+      const box = document.getElementById('fieldChecklist');
+      const candidates = fieldNames.filter(f => f !== imageField);
+      box.innerHTML = candidates.map(f => {
+        const checked = displayFields.includes(f);
+        return '<label class="checkbox"><input type="checkbox" data-field="' + escapeHtml(f) +
+          '" ' + (checked ? 'checked' : '') + '>' + escapeHtml(f) + '</label>';
+      }).join('') || '<span class="hint">No other fields on this worksheet.</span>';
+    }
+
+    function renderOrderList() {
+      const list = document.getElementById('orderList');
+      if (!displayFields.length) {
+        list.innerHTML = '<div class="order-item"><span class="hint">Nothing selected yet.</span></div>';
+        return;
+      }
+      list.innerHTML = displayFields.map((f, i) =>
+        '<div class="order-item">' +
+        '<button type="button" data-action="up" data-index="' + i + '" ' + (i === 0 ? 'disabled' : '') + '>&uarr;</button>' +
+        '<button type="button" data-action="down" data-index="' + i + '" ' + (i === displayFields.length - 1 ? 'disabled' : '') + '>&darr;</button>' +
+        '<span class="label">' + escapeHtml(f) + '</span>' +
+        '</div>'
+      ).join('');
+    }
+
+    function updateColumnsVisibility() {
+      document.getElementById('columnsWrap').style.display = layout === 'card' ? '' : 'none';
+    }
+
+    function updateSaveEnabled() {
+      const wsName = document.getElementById('worksheet').value;
+      document.getElementById('saveBtn').disabled = !(wsName && imageField && filterField);
+    }
+
+    async function onWorksheetChange(preserve) {
+      const wsName = document.getElementById('worksheet').value;
+      const ws = dashboard.worksheets.find(w => w.name === wsName);
+      showError('');
+      if (!ws) { fieldNames = []; return; }
+
+      let table;
+      try {
+        table = await ws.getSummaryDataAsync({ ignoreSelection: true, maxRows: 1 });
+      } catch (e) {
+        showError('Could not read columns from that worksheet: ' + e.message);
+        return;
+      }
+      fieldNames = table.columns.map(c => c.fieldName);
+
+      fillSelect(document.getElementById('imageField'), fieldNames, preserve ? imageField : '');
+      const titleSel = document.getElementById('titleField');
+      titleSel.innerHTML = '<option value="">(none)</option>' +
+        fieldNames.map(f => '<option value="' + escapeHtml(f) + '">' + escapeHtml(f) + '</option>').join('');
+      if (preserve && titleField && fieldNames.includes(titleField)) titleSel.value = titleField;
+      fillSelect(document.getElementById('filterField'), fieldNames, preserve ? filterField : '');
+
+      imageField = document.getElementById('imageField').value;
+      titleField = titleSel.value;
+      filterField = document.getElementById('filterField').value;
+
+      if (!preserve) { targetWorksheets = []; displayFields = []; }
+      else { displayFields = displayFields.filter(f => fieldNames.includes(f) && f !== imageField); }
+
+      renderTargetChecklist();
+      renderFieldChecklist();
+      renderOrderList();
+      updateSaveEnabled();
+    }
+
+    async function init() {
+      const openPayload = await tableau.extensions.initializeDialogAsync();
+      dashboard = tableau.extensions.dashboardContent.dashboard;
+
+      const wsSelect = document.getElementById('worksheet');
+      dashboard.worksheets.forEach(ws => {
+        const opt = document.createElement('option');
+        opt.value = ws.name;
+        opt.textContent = ws.name;
+        wsSelect.appendChild(opt);
+      });
+
+      let existing = null;
+      try { existing = openPayload ? JSON.parse(openPayload) : null; } catch (_) {}
+
+      if (existing && existing.worksheet && dashboard.worksheets.some(w => w.name === existing.worksheet)) {
+        wsSelect.value = existing.worksheet;
+      }
+      title = (existing && existing.title) || '';
+      imageField = (existing && existing.imageField) || '';
+      titleField = (existing && existing.titleField) || '';
+      filterField = (existing && existing.filterField) || '';
+      layout = (existing && existing.layout) || 'card';
+      columns = (existing && existing.columns) || 4;
+      displayFields = Array.isArray(existing && existing.displayFields) ? existing.displayFields : [];
+      targetWorksheets = (existing && existing.targetWorksheets) || [];
+
+      document.getElementById('extTitle').value = title;
+      document.getElementById('layout').value = layout;
+      document.getElementById('columns').value = columns;
+      updateColumnsVisibility();
+
+      await onWorksheetChange(true);
+
+      document.getElementById('extTitle').addEventListener('input', e => { title = e.target.value; });
+      wsSelect.addEventListener('change', () => onWorksheetChange(false));
+      document.getElementById('imageField').addEventListener('change', e => {
+        imageField = e.target.value;
+        displayFields = displayFields.filter(f => f !== imageField);
+        renderFieldChecklist();
+        renderOrderList();
+        updateSaveEnabled();
+      });
+      document.getElementById('titleField').addEventListener('change', e => { titleField = e.target.value; });
+      document.getElementById('filterField').addEventListener('change', e => { filterField = e.target.value; updateSaveEnabled(); });
+      document.getElementById('layout').addEventListener('change', e => { layout = e.target.value; updateColumnsVisibility(); });
+      document.getElementById('columns').addEventListener('input', e => {
+        const n = parseInt(e.target.value, 10);
+        columns = Number.isFinite(n) ? Math.min(8, Math.max(2, n)) : 4;
+      });
+
+      document.getElementById('fieldChecklist').addEventListener('change', e => {
+        const field = e.target.getAttribute('data-field');
+        if (field == null) return;
+        if (e.target.checked) {
+          if (!displayFields.includes(field)) displayFields.push(field);
+        } else {
+          displayFields = displayFields.filter(f => f !== field);
+        }
+        renderOrderList();
+      });
+
+      document.getElementById('orderList').addEventListener('click', e => {
+        const action = e.target.getAttribute('data-action');
+        if (!action) return;
+        const index = parseInt(e.target.getAttribute('data-index'), 10);
+        const j = action === 'up' ? index - 1 : index + 1;
+        if (j < 0 || j >= displayFields.length) return;
+        [displayFields[index], displayFields[j]] = [displayFields[j], displayFields[index]];
+        renderOrderList();
+      });
+
+      document.getElementById('targetChecklist').addEventListener('change', e => {
+        const name = e.target.getAttribute('data-name');
+        if (name == null) return;
+        if (e.target.checked) {
+          if (!targetWorksheets.includes(name)) targetWorksheets.push(name);
+        } else {
+          targetWorksheets = targetWorksheets.filter(n => n !== name);
+        }
+      });
+
+      document.getElementById('saveBtn').addEventListener('click', () => {
+        const wsName = document.getElementById('worksheet').value;
+        if (!wsName || !imageField || !filterField) {
+          showError('Choose a worksheet, an image URL field, and a filter field.');
+          return;
+        }
+        tableau.extensions.ui.closeDialog(JSON.stringify({
+          worksheet: wsName,
+          title,
+          imageField,
+          titleField,
+          filterField,
+          layout,
+          columns,
+          displayFields,
+          targetWorksheets,
+        }));
+      });
+
+      document.getElementById('cancelBtn').addEventListener('click', () => {
+        tableau.extensions.ui.closeDialog('');
+      });
+    }
+
+    init().catch(e => showError('Failed to load: ' + e.message));
+  </script>
+</body>
+</html>

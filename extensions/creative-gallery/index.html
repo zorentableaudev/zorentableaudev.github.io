@@ -1,0 +1,403 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Creative Gallery</title>
+  <script src="./tableau.extensions.1.latest.min.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      font-size: 12px;
+      color: #1a1a1a;
+      background: #fff;
+      height: 100vh;
+      overflow: hidden;
+    }
+    #app { display: flex; flex-direction: column; height: 100vh; }
+
+    .header {
+      background: #1e6eb5;
+      color: #fff;
+      padding: 8px 12px;
+      flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+    }
+    .header h1 { font-size: 12px; font-weight: 700; letter-spacing: .2px; }
+    .header .status { font-size: 10px; opacity: .85; }
+    .header .actions { display: flex; gap: 6px; }
+    .header button {
+      background: rgba(255,255,255,.15);
+      color: #fff;
+      border: 1px solid rgba(255,255,255,.4);
+      border-radius: 4px;
+      padding: 4px 9px;
+      font-size: 11px;
+      cursor: pointer;
+    }
+    .header button:hover { background: rgba(255,255,255,.28); }
+    .header button:disabled { opacity: .4; cursor: default; }
+
+    .content { flex: 1; overflow: auto; }
+
+    /* Card grid layout */
+    .gallery {
+      display: grid;
+      grid-template-columns: repeat(var(--cols, 4), 1fr);
+      gap: 8px;
+      padding: 8px;
+    }
+    .tile {
+      cursor: pointer;
+      border: 2px solid transparent;
+      border-radius: 6px;
+      overflow: hidden;
+      background: #f6f7f9;
+    }
+    .tile:hover { border-color: #cfe0f0; }
+    .tile.active { border-color: #1e6eb5; box-shadow: 0 0 0 2px rgba(30,110,181,.25); }
+    .tile img {
+      width: 100%;
+      height: 90px;
+      object-fit: cover;
+      display: block;
+      background: #eef0f3;
+    }
+    .tile img.broken { visibility: hidden; }
+    .tile-body { padding: 5px 7px 7px; }
+    .tile-title {
+      font-size: 11px;
+      font-weight: 700;
+      margin-bottom: 3px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .tile-metric {
+      display: flex;
+      justify-content: space-between;
+      gap: 6px;
+      font-size: 10px;
+      color: #444;
+      line-height: 1.5;
+    }
+    .tile-metric .metric-label { color: #777; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .tile-metric .metric-value { font-weight: 600; white-space: nowrap; }
+
+    /* Table layout */
+    table { border-collapse: collapse; width: 100%; }
+    thead th {
+      position: sticky; top: 0; z-index: 1;
+      background: #f6f7f9;
+      border-bottom: 1px solid #dde1e7;
+      text-align: left;
+      padding: 6px 10px 6px 8px;
+      font-size: 10px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: .3px;
+      color: #555;
+      white-space: nowrap;
+    }
+    tbody td {
+      padding: 4px 8px;
+      border-bottom: 1px solid #eef0f3;
+      white-space: nowrap;
+    }
+    tr.row-item { cursor: pointer; }
+    tr.row-item:hover td { background: #fafbfc; }
+    tr.row-item.active td { background: #eaf2fb; }
+    td.thumb-cell img {
+      width: 60px;
+      height: 40px;
+      object-fit: cover;
+      display: block;
+      background: #eef0f3;
+      border-radius: 3px;
+    }
+    td.thumb-cell img.broken { visibility: hidden; }
+
+    .empty-state, .error-state {
+      padding: 24px 16px;
+      text-align: center;
+      color: #666;
+    }
+    .error-state { color: #b3261e; }
+    .empty-state button, .error-state button {
+      margin-top: 10px;
+      padding: 7px 14px;
+      background: #1e6eb5;
+      color: #fff;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 12px;
+    }
+  </style>
+</head>
+<body>
+  <div id="app">
+    <div class="header">
+      <h1 id="title">Creative Gallery</h1>
+      <span class="status" id="status"></span>
+      <div class="actions">
+        <button id="clearBtn" disabled>Clear filter</button>
+        <button id="configureBtn">Configure</button>
+      </div>
+    </div>
+    <div class="content" id="content">
+      <div class="empty-state">Loading...</div>
+    </div>
+  </div>
+
+  <script>
+    let dashboard;
+    let boundWs = null;
+    let config = {
+      worksheet: '', title: '', imageField: '', titleField: '', filterField: '',
+      layout: 'card', columns: 4, displayFields: [], targetWorksheets: [],
+    };
+    let selectedValue = null;
+
+    const content = document.getElementById('content');
+
+    function setStatus(text) {
+      document.getElementById('status').textContent = text || '';
+    }
+
+    function escapeHtml(str) {
+      const d = document.createElement('div');
+      d.textContent = str == null ? '' : String(str);
+      return d.innerHTML;
+    }
+
+    function isConfigured() {
+      return !!(config.worksheet && config.imageField && config.filterField);
+    }
+
+    function loadConfig() {
+      const s = tableau.extensions.settings.getAll();
+      let parsed = {};
+      try { parsed = s.config ? JSON.parse(s.config) : {}; } catch (_) { parsed = {}; }
+      config = {
+        worksheet: parsed.worksheet || '',
+        title: parsed.title || '',
+        imageField: parsed.imageField || '',
+        titleField: parsed.titleField || '',
+        filterField: parsed.filterField || '',
+        layout: parsed.layout === 'table' ? 'table' : 'card',
+        columns: parsed.columns || 4,
+        displayFields: Array.isArray(parsed.displayFields) ? parsed.displayFields : [],
+        targetWorksheets: Array.isArray(parsed.targetWorksheets) ? parsed.targetWorksheets : [],
+      };
+    }
+
+    function renderUnconfigured(message) {
+      content.innerHTML =
+        '<div class="empty-state">' +
+        escapeHtml(message || 'This extension has not been configured yet.') +
+        '<br><button id="configureNow">Configure</button></div>';
+      document.getElementById('configureNow').addEventListener('click', openConfigure);
+    }
+
+    function renderError(message) {
+      content.innerHTML = '<div class="error-state">' + escapeHtml(message) + '</div>';
+    }
+
+    function bindWorksheetEvents() {
+      if (boundWs) {
+        boundWs.removeEventListener(tableau.TableauEventType.FilterChanged, loadAndRender);
+        boundWs.removeEventListener(tableau.TableauEventType.SummaryDataChanged, loadAndRender);
+        boundWs = null;
+      }
+      if (!config.worksheet) return;
+      const ws = dashboard.worksheets.find(w => w.name === config.worksheet);
+      if (!ws) return;
+      ws.addEventListener(tableau.TableauEventType.FilterChanged, loadAndRender);
+      ws.addEventListener(tableau.TableauEventType.SummaryDataChanged, loadAndRender);
+      boundWs = ws;
+    }
+
+    async function loadAndRender() {
+      if (!isConfigured()) { renderUnconfigured(); return; }
+
+      const ws = dashboard.worksheets.find(w => w.name === config.worksheet);
+      if (!ws) {
+        renderUnconfigured('Configured worksheet "' + config.worksheet + '" was not found on this dashboard. It may have been renamed or removed.');
+        return;
+      }
+
+      let table;
+      try {
+        table = await ws.getSummaryDataAsync({ ignoreSelection: true });
+      } catch (e) {
+        renderError('Could not read data from "' + config.worksheet + '": ' + e.message);
+        return;
+      }
+
+      const fieldNames = table.columns.map(c => c.fieldName);
+      const imgIdx = fieldNames.indexOf(config.imageField);
+      const filterIdx = fieldNames.indexOf(config.filterField);
+      const titleIdx = config.titleField ? fieldNames.indexOf(config.titleField) : -1;
+      const displayIdx = config.displayFields
+        .map(f => ({ field: f, idx: fieldNames.indexOf(f) }))
+        .filter(d => d.idx !== -1);
+
+      if (imgIdx === -1 || filterIdx === -1) {
+        renderUnconfigured('Configured fields are no longer available on "' + config.worksheet + '". Please reconfigure.');
+        return;
+      }
+
+      document.getElementById('title').textContent = config.title || ('Creative Gallery — ' + config.worksheet);
+
+      if (table.totalRowCount === 0) {
+        content.innerHTML = '<div class="empty-state">No creatives to show (check filters on "' + config.worksheet + '").</div>';
+        return;
+      }
+
+      const seen = new Set();
+      const items = [];
+      table.data.forEach(r => {
+        const value = r[filterIdx].value;
+        if (value == null || seen.has(value)) return;
+        seen.add(value);
+        items.push({
+          value: value,
+          title: titleIdx !== -1 ? r[titleIdx].formattedValue : r[filterIdx].formattedValue,
+          imageUrl: r[imgIdx].formattedValue,
+          metrics: displayIdx.map(d => ({ label: d.field, value: r[d.idx].formattedValue })),
+        });
+      });
+
+      if (config.layout === 'table') renderTable(items);
+      else renderCards(items);
+    }
+
+    function renderCards(items) {
+      let html = '<div class="gallery" style="--cols:' + config.columns + '">';
+      items.forEach(t => {
+        const active = String(t.value) === String(selectedValue) ? ' active' : '';
+        html += '<div class="tile' + active + '" data-value="' + escapeHtml(t.value) + '">' +
+          '<img src="' + escapeHtml(t.imageUrl) + '" alt="' + escapeHtml(t.title) + '" loading="lazy" onerror="this.classList.add(\'broken\')">' +
+          '<div class="tile-body">';
+        if (config.titleField) html += '<div class="tile-title">' + escapeHtml(t.title) + '</div>';
+        t.metrics.forEach(m => {
+          html += '<div class="tile-metric"><span class="metric-label">' + escapeHtml(m.label) +
+            '</span><span class="metric-value">' + escapeHtml(m.value) + '</span></div>';
+        });
+        html += '</div></div>';
+      });
+      html += '</div>';
+      content.innerHTML = html;
+      document.getElementById('clearBtn').disabled = selectedValue == null;
+    }
+
+    function renderTable(items) {
+      const metricFields = config.displayFields;
+      let html = '<table><thead><tr><th></th>';
+      if (config.titleField) html += '<th>' + escapeHtml(config.titleField) + '</th>';
+      metricFields.forEach(f => { html += '<th>' + escapeHtml(f) + '</th>'; });
+      html += '</tr></thead><tbody>';
+      items.forEach(t => {
+        const active = String(t.value) === String(selectedValue) ? ' active' : '';
+        html += '<tr class="row-item' + active + '" data-value="' + escapeHtml(t.value) + '">' +
+          '<td class="thumb-cell"><img src="' + escapeHtml(t.imageUrl) + '" alt="' + escapeHtml(t.title) +
+          '" loading="lazy" onerror="this.classList.add(\'broken\')"></td>';
+        if (config.titleField) html += '<td>' + escapeHtml(t.title) + '</td>';
+        t.metrics.forEach(m => { html += '<td>' + escapeHtml(m.value) + '</td>'; });
+        html += '</tr>';
+      });
+      html += '</tbody></table>';
+      content.innerHTML = html;
+      document.getElementById('clearBtn').disabled = selectedValue == null;
+    }
+
+    async function applyFilterToTargets(value) {
+      setStatus('Filtering...');
+      let hadError = false;
+      for (const name of config.targetWorksheets) {
+        const ws = dashboard.worksheets.find(w => w.name === name);
+        if (!ws) continue;
+        try {
+          await ws.applyFilterAsync(config.filterField, [value], tableau.FilterUpdateType.Replace);
+        } catch (e) {
+          hadError = true;
+        }
+      }
+      setStatus(hadError ? 'Some sheets could not be filtered' : '');
+    }
+
+    async function clearFilterOnTargets() {
+      setStatus('Clearing...');
+      for (const name of config.targetWorksheets) {
+        const ws = dashboard.worksheets.find(w => w.name === name);
+        if (!ws) continue;
+        try {
+          await ws.clearFilterAsync(config.filterField);
+        } catch (e) {
+          // field may not exist on this sheet - nothing to clear
+        }
+      }
+      setStatus('');
+    }
+
+    async function onItemClick(value) {
+      const item = content.querySelector('[data-value="' + CSS.escape(String(value)) + '"]');
+      if (String(selectedValue) === String(value)) {
+        selectedValue = null;
+        if (item) item.classList.remove('active');
+        document.getElementById('clearBtn').disabled = true;
+        await clearFilterOnTargets();
+        return;
+      }
+      const prevActive = content.querySelector('.active');
+      if (prevActive) prevActive.classList.remove('active');
+      selectedValue = value;
+      if (item) item.classList.add('active');
+      document.getElementById('clearBtn').disabled = false;
+      await applyFilterToTargets(value);
+    }
+
+    async function openConfigure() {
+      const payload = JSON.stringify(config);
+      try {
+        const result = await tableau.extensions.ui.displayDialogAsync(
+          './config.html', payload, { height: 640, width: 500 }
+        );
+        if (!result) return;
+        const parsed = JSON.parse(result);
+        tableau.extensions.settings.set('config', JSON.stringify(parsed));
+        await tableau.extensions.settings.saveAsync();
+        selectedValue = null;
+        loadConfig();
+        bindWorksheetEvents();
+        await loadAndRender();
+      } catch (e) {
+        // user cancelled the dialog - ErrorCodes.DialogClosedByUser - nothing to do
+      }
+    }
+
+    async function init() {
+      await tableau.extensions.initializeAsync({ configure: openConfigure });
+      dashboard = tableau.extensions.dashboardContent.dashboard;
+      loadConfig();
+      bindWorksheetEvents();
+      await loadAndRender();
+
+      document.getElementById('configureBtn').addEventListener('click', openConfigure);
+      document.getElementById('clearBtn').addEventListener('click', () => onItemClick(selectedValue));
+
+      content.addEventListener('click', e => {
+        const item = e.target.closest('[data-value]');
+        if (item) onItemClick(item.getAttribute('data-value'));
+      });
+    }
+
+    init().catch(e => renderError('Failed to initialize: ' + e.message));
+  </script>
+</body>
+</html>
