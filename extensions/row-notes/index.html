@@ -142,7 +142,7 @@
     let lastConfigRaw = '';
 
     // config.columnOrder: array of tokens, each "src:<fieldName>" or "custom:<id>"
-    // config.customColumns: { [id]: { id, label, type: 'text'|'select', options?: string[] } }
+    // config.customColumns: { [id]: { id, label, type: 'text'|'select', options?: string[], optionColors?: { [option]: hex } } }
     let config = { worksheet: '', keyField: '', columnOrder: [], customColumns: {} };
     let columnWidths = {};   // { [token]: pixelWidth }
     let rowData = {};        // { [rowKey]: { [customColumnId]: value } }
@@ -170,6 +170,10 @@
       if (token.startsWith('src:')) return token.slice(4);
       const def = config.customColumns[token.slice(7)];
       return def ? def.label : token;
+    }
+
+    function selectColor(def, value) {
+      return (value && def.optionColors && def.optionColors[value]) || '';
     }
 
     function colWidth(token) {
@@ -306,10 +310,15 @@
           const val = savedRow[id] || '';
           if (def.type === 'select') {
             const opts = def.options || [];
+            const bg = selectColor(def, val);
             html += '<td class="new-col"><select class="cell-select" data-row-key="' + escapeHtml(key) +
-              '" data-col-id="' + id + '"><option value=""' + (val === '' ? ' selected' : '') + '>—</option>' +
-              opts.map(o => '<option value="' + escapeHtml(o) + '"' + (val === o ? ' selected' : '') + '>' +
-                escapeHtml(o) + '</option>').join('') +
+              '" data-col-id="' + id + '"' + (bg ? ' style="background-color:' + bg + '"' : '') +
+              '><option value=""' + (val === '' ? ' selected' : '') + '>—</option>' +
+              opts.map(o => {
+                const optBg = def.optionColors && def.optionColors[o];
+                return '<option value="' + escapeHtml(o) + '"' + (val === o ? ' selected' : '') +
+                  (optBg ? ' style="background-color:' + optBg + '"' : '') + '>' + escapeHtml(o) + '</option>';
+              }).join('') +
               '</select></td>';
           } else {
             html += '<td class="new-col"><input type="text" class="cell-input" data-row-key="' + escapeHtml(key) +
@@ -328,6 +337,9 @@
       const colId = e.target.getAttribute('data-col-id');
       if (!rowData[key]) rowData[key] = {};
       rowData[key][colId] = e.target.value;
+      if (e.target.classList.contains('cell-select')) {
+        e.target.style.backgroundColor = selectColor(config.customColumns[colId], e.target.value);
+      }
       dirtyCells.add(key + '::' + colId);
       scheduleSave();
     }
@@ -370,7 +382,11 @@
           const el = content.querySelector(
             '[data-row-key="' + CSS.escape(key) + '"][data-col-id="' + CSS.escape(colId) + '"]'
           );
-          if (el) el.value = incomingCols[colId] || '';
+          if (!el) return;
+          el.value = incomingCols[colId] || '';
+          if (el.classList.contains('cell-select')) {
+            el.style.backgroundColor = selectColor(config.customColumns[colId], el.value);
+          }
         });
       });
     }
