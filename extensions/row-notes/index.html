@@ -67,6 +67,8 @@
       text-overflow: ellipsis;
     }
     thead th.new-col { background: #eaf2fb; color: #1e6eb5; }
+    thead th { cursor: grab; }
+    thead th.dragging { opacity: .5; }
     .resize-handle {
       position: absolute;
       right: -3px;
@@ -139,14 +141,22 @@
     let dashboard;
     let boundWs = null;
     let resizingToken = null;
+    let headerDragToken = null;
     let lastConfigRaw = '';
 
     // config.columnOrder: array of tokens, each "src:<fieldName>" or "custom:<id>"
     // config.customColumns: { [id]: { id, label, type: 'text'|'select', options?: string[], optionColors?: { [option]: hex } } }
     // config.sourceAliases: { [sourceFieldName]: displayLabel }
-    let config = { worksheet: '', keyField: '', columnOrder: [], customColumns: {}, sourceAliases: {} };
+    // config.title: optional custom extension title
+    let config = { worksheet: '', keyField: '', title: '', columnOrder: [], customColumns: {}, sourceAliases: {} };
     let columnWidths = {};   // { [token]: pixelWidth }
     let rowData = {};        // { [rowKey]: { [customColumnId]: value } }
+
+    // Cache of the last fetched worksheet data, so header-drag reordering can
+    // re-render instantly without an extra getSummaryDataAsync round trip per step.
+    let lastFieldNames = [];
+    let lastRows = [];
+    let lastKeyIdx = -1;
 
     let saveTimer = null;
     const dirtyCells = new Set(); // "rowKey::colId" tags with an unsaved local edit in flight
@@ -199,6 +209,7 @@
       config = {
         worksheet: parsed.worksheet || '',
         keyField: parsed.keyField || '',
+        title: parsed.title || '',
         columnOrder: Array.isArray(parsed.columnOrder) ? parsed.columnOrder : [],
         customColumns: (parsed.customColumns && typeof parsed.customColumns === 'object') ? parsed.customColumns : {},
         sourceAliases: (parsed.sourceAliases && typeof parsed.sourceAliases === 'object') ? parsed.sourceAliases : {},
@@ -257,25 +268,32 @@
         return;
       }
 
-      document.getElementById('title').textContent = 'Row Notes — ' + config.worksheet;
+      document.getElementById('title').textContent = config.title || ('Row Notes — ' + config.worksheet);
 
       if (table.totalRowCount === 0) {
         content.innerHTML = '<div class="empty-state">No rows to show (check filters on "' + config.worksheet + '").</div>';
         return;
       }
 
+      const rows = table.data.map(r => r.map(cell => cell.formattedValue));
+      lastFieldNames = fieldNames;
+      lastRows = rows;
+      lastKeyIdx = keyIdx;
+
+      renderFromColumnOrder();
+    }
+
+    function renderFromColumnOrder() {
       const missingSource = [];
       const tokens = config.columnOrder.filter(t => {
         if (t.startsWith('src:')) {
-          const ok = fieldNames.includes(t.slice(4));
+          const ok = lastFieldNames.includes(t.slice(4));
           if (!ok) missingSource.push(t.slice(4));
           return ok;
         }
         return !!config.customColumns[t.slice(7)];
       });
-
-      const rows = table.data.map(r => r.map(cell => cell.formattedValue));
-      renderTable(rows, keyIdx, fieldNames, tokens, missingSource);
+      renderTable(lastRows, lastKeyIdx, lastFieldNames, tokens, missingSource);
     }
 
     function renderTable(rows, keyIdx, fieldNames, tokens, missingSource) {
@@ -292,7 +310,7 @@
         '</colgroup><thead><tr>';
       tokens.forEach(t => {
         const cls = t.startsWith('custom:') ? ' class="new-col"' : '';
-        html += '<th' + cls + '>' + escapeHtml(colLabel(t)) +
+        html += '<th' + cls + ' data-token="' + t + '">' + escapeHtml(colLabel(t)) +
           '<div class="resize-handle" data-token="' + t + '"></div></th>';
       });
       html += '</tr></thead><tbody>';
@@ -445,10 +463,63 @@
       e.preventDefault();
     }
 
+    async function persistConfig() {
+      setStatus('Saving...');
+      try {
+        const payload = JSON.stringify(config);
+        lastConfigRaw = payload;
+        tableau.extensions.settings.set('config', payload);
+        await tableau.extensions.settings.saveAsync();
+        setStatus('Saved');
+        setTimeout(() => setStatus(''), 1500);
+      } catch (e) {
+        setStatus('Save failed: ' + e.message);
+      }
+    }
+
+    // Same mouse-based drag pattern as column resize/config-dialog reorder:
+    // live-reorders as the cursor crosses into another header, then persists once on mouseup.
+    function startHeaderDrag(e, token) {
+      headerDragToken = token;
+      let moved = false;
+      const startTh = content.querySelector('th[data-token="' + CSS.escape(token) + '"]');
+      if (startTh) startTh.classList.add('dragging');
+      document.body.style.cursor = 'grabbing';
+
+      function onMove(ev) {
+        const el = document.elementFromPoint(ev.clientX, ev.clientY);
+        const targetTh = el && el.closest && el.closest('th');
+        if (!targetTh) return;
+        const targetToken = targetTh.getAttribute('data-token');
+        if (!targetToken || targetToken === headerDragToken) return;
+        const newOrder = config.columnOrder.filter(t => t !== headerDragToken);
+        const idx = newOrder.indexOf(targetToken);
+        if (idx === -1) return;
+        newOrder.splice(idx, 0, headerDragToken);
+        config.columnOrder = newOrder;
+        moved = true;
+        renderFromColumnOrder();
+        const th2 = content.querySelector('th[data-token="' + CSS.escape(headerDragToken) + '"]');
+        if (th2) th2.classList.add('dragging');
+      }
+      function onUp() {
+        document.removeEventListener('mousemove', onMove);
+        document.removeEventListener('mouseup', onUp);
+        document.body.style.cursor = '';
+        content.querySelectorAll('th.dragging').forEach(el => el.classList.remove('dragging'));
+        headerDragToken = null;
+        if (moved) persistConfig();
+      }
+      document.addEventListener('mousemove', onMove);
+      document.addEventListener('mouseup', onUp);
+      e.preventDefault();
+    }
+
     async function openConfigure() {
       const payload = JSON.stringify({
         worksheet: config.worksheet,
         keyField: config.keyField,
+        title: config.title,
         columnOrder: config.columnOrder,
         customColumns: config.customColumns,
         sourceAliases: config.sourceAliases,
@@ -462,6 +533,7 @@
         tableau.extensions.settings.set('config', JSON.stringify({
           worksheet: parsed.worksheet,
           keyField: parsed.keyField,
+          title: parsed.title,
           columnOrder: parsed.columnOrder,
           customColumns: parsed.customColumns,
           sourceAliases: parsed.sourceAliases,
@@ -495,7 +567,9 @@
       });
       content.addEventListener('mousedown', e => {
         const handle = e.target.closest('.resize-handle');
-        if (handle) startResize(e, handle.getAttribute('data-token'));
+        if (handle) { startResize(e, handle.getAttribute('data-token')); return; }
+        const th = e.target.closest('th');
+        if (th) startHeaderDrag(e, th.getAttribute('data-token'));
       });
     }
 

@@ -74,6 +74,11 @@
       border-bottom: 1px solid #eef0f3;
     }
     .order-item:last-child { border-bottom: none; }
+    .order-item.dragging { opacity: .5; background: #eef4fb; }
+    .drag-handle {
+      cursor: grab; color: #99a1ab; font-size: 14px; letter-spacing: -1px;
+      padding: 0 2px; user-select: none;
+    }
     .order-item .badge {
       font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: .3px;
       padding: 2px 6px; border-radius: 3px;
@@ -130,6 +135,9 @@
   <h1>Row Notes - Configuration</h1>
   <p class="hint">Pick the worksheet to annotate and the field that uniquely identifies each row. Then choose which of its columns to show, add your own text/dropdown columns, and put everything in the order you want.</p>
 
+  <label for="extTitle">Extension title (optional)</label>
+  <input type="text" id="extTitle" placeholder='Defaults to "Row Notes — &lt;worksheet name&gt;"'>
+
   <label for="worksheet">Worksheet (table view)</label>
   <select id="worksheet"></select>
 
@@ -148,7 +156,7 @@
   </div>
 
   <h2>Column order</h2>
-  <p class="hint">Use the arrows to interleave your columns with the source columns however you like. Edit lets you rename any column's display label, including source columns.</p>
+  <p class="hint">Drag the &#8942;&#8942; handle (or use the arrows) to interleave your columns with the source columns however you like. Edit lets you rename any column's display label, including source columns. You can also drag column headers directly in the extension itself.</p>
   <div class="order-list" id="orderList"></div>
 
   <div id="error" class="error"></div>
@@ -162,10 +170,12 @@
     let dashboard;
     let fieldNames = [];
     let keyField = '';
+    let title = '';            // optional custom extension title
     let customColumns = {};   // { [id]: { id, label, type, options? } }
     let sourceAliases = {};   // { [fieldName]: displayLabel } - overrides for source columns
     let order = [];           // tokens: "src:<field>" | "custom:<id>"
     let editingToken = null;  // full token ("src:<field>" or "custom:<id>") whose inline editor is open
+    let dragIndex = null;      // index of the order-list row currently being dragged
 
     const DEFAULT_PALETTE = [
       '#f8d7da', '#fff3cd', '#d4edda', '#d1ecf1',
@@ -240,6 +250,7 @@
         const badgeText = isSrc ? 'source' : customColumns[t.slice(7)].type;
         let row =
           '<div class="order-item" data-index="' + i + '">' +
+          '<span class="drag-handle" title="Drag to reorder">&#8942;&#8942;</span>' +
           '<button type="button" data-action="up" data-index="' + i + '" ' + (i === 0 ? 'disabled' : '') + '>&uarr;</button>' +
           '<button type="button" data-action="down" data-index="' + i + '" ' + (i === order.length - 1 ? 'disabled' : '') + '>&darr;</button>' +
           '<span class="badge ' + badge + '">' + badgeText + '</span>' +
@@ -293,6 +304,41 @@
       if (j < 0 || j >= order.length) return;
       [order[index], order[j]] = [order[j], order[index]];
       renderOrderList();
+    }
+
+    // Custom mouse-based drag reorder (not native HTML5 drag-and-drop, which
+    // behaves inconsistently for sortable lists and doesn't fire from simple
+    // synthetic mouse events). Live-reorders as the cursor crosses into
+    // another row, same interaction model as most sortable-list widgets.
+    function startOrderDrag(e, index) {
+      dragIndex = index;
+      document.body.style.cursor = 'grabbing';
+      const startItem = document.querySelector('.order-item[data-index="' + index + '"]');
+      if (startItem) startItem.classList.add('dragging');
+
+      function onMove(ev) {
+        const el = document.elementFromPoint(ev.clientX, ev.clientY);
+        const row = el && el.closest && el.closest('.order-item');
+        if (!row) return;
+        const overIndex = parseInt(row.getAttribute('data-index'), 10);
+        if (Number.isNaN(overIndex) || overIndex === dragIndex) return;
+        const [moved] = order.splice(dragIndex, 1);
+        order.splice(overIndex, 0, moved);
+        dragIndex = overIndex;
+        renderOrderList();
+        const newItem = document.querySelector('.order-item[data-index="' + dragIndex + '"]');
+        if (newItem) newItem.classList.add('dragging');
+      }
+      function onUp() {
+        document.removeEventListener('mousemove', onMove);
+        document.removeEventListener('mouseup', onUp);
+        document.body.style.cursor = '';
+        document.querySelectorAll('.order-item.dragging').forEach(el => el.classList.remove('dragging'));
+        dragIndex = null;
+      }
+      document.addEventListener('mousemove', onMove);
+      document.addEventListener('mouseup', onUp);
+      e.preventDefault();
     }
 
     function removeToken(index) {
@@ -362,10 +408,13 @@
         wsSelect.value = existing.worksheet;
       }
       keyField = (existing && existing.keyField) || '';
+      title = (existing && existing.title) || '';
       customColumns = (existing && existing.customColumns) || {};
       sourceAliases = (existing && existing.sourceAliases) || {};
       order = (existing && existing.columnOrder) || [];
       Object.values(customColumns).forEach(ensureOptionColors);
+      document.getElementById('extTitle').value = title;
+      document.getElementById('extTitle').addEventListener('input', e => { title = e.target.value; });
 
       await onWorksheetChange(!!(existing && existing.columnOrder && existing.columnOrder.length));
 
@@ -385,6 +434,14 @@
 
       document.getElementById('addText').addEventListener('click', () => addCustomColumn('text'));
       document.getElementById('addSelect').addEventListener('click', () => addCustomColumn('select'));
+
+      document.getElementById('orderList').addEventListener('mousedown', e => {
+        const grip = e.target.closest('.drag-handle');
+        if (!grip) return;
+        const item = grip.closest('.order-item');
+        const index = parseInt(item.getAttribute('data-index'), 10);
+        startOrderDrag(e, index);
+      });
 
       document.getElementById('orderList').addEventListener('click', e => {
         const action = e.target.getAttribute('data-action');
@@ -445,6 +502,7 @@
         tableau.extensions.ui.closeDialog(JSON.stringify({
           worksheet: wsName,
           keyField,
+          title,
           columnOrder: order,
           customColumns,
           sourceAliases,
