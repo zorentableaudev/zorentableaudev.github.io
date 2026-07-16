@@ -27,9 +27,21 @@
       justify-content: space-between;
       gap: 8px;
     }
-    .header h1 { font-size: 12px; font-weight: 700; letter-spacing: .2px; }
+    .header h1 { font-size: 12px; font-weight: 700; letter-spacing: .2px; flex-shrink: 0; }
     .header .status { font-size: 10px; opacity: .85; }
-    .header .actions { display: flex; gap: 6px; }
+    .header .actions { display: flex; gap: 6px; flex-shrink: 0; }
+    .header .title-group { display: flex; align-items: center; gap: 8px; min-width: 0; }
+    .header .sort-control { display: none; align-items: center; gap: 4px; }
+    .header .sort-control select {
+      max-width: 140px;
+      background: rgba(255,255,255,.15);
+      color: #fff;
+      border: 1px solid rgba(255,255,255,.4);
+      border-radius: 4px;
+      padding: 3px 4px;
+      font-size: 10px;
+    }
+    .header .sort-control select option { color: #1a1a1a; }
     .header button {
       background: rgba(255,255,255,.15);
       color: #fff;
@@ -38,6 +50,10 @@
       padding: 4px 9px;
       font-size: 11px;
       cursor: pointer;
+    }
+    .header .sort-control button {
+      padding: 3px 7px;
+      font-size: 11px;
     }
     .header button:hover { background: rgba(255,255,255,.28); }
     .header button:disabled { opacity: .4; cursor: default; }
@@ -199,7 +215,13 @@
 <body>
   <div id="app">
     <div class="header">
-      <h1 id="title">Creative Gallery</h1>
+      <div class="title-group">
+        <h1 id="title">Creative Gallery</h1>
+        <div class="sort-control">
+          <select id="sortSelect" title="Sort by"></select>
+          <button id="sortDirBtn" title="Toggle sort direction" disabled>&uarr;</button>
+        </div>
+      </div>
       <span class="status" id="status"></span>
       <div class="actions">
         <button id="clearBtn" disabled>Clear filter</button>
@@ -232,6 +254,7 @@
     let selectedValue = null;
     let lastItems = [];
     let lastItemsByValue = new Map();
+    let lastFieldNames = [];
     let resizingField = null;
     let headerDragField = null;
     let lastHoverValue = null;
@@ -389,6 +412,7 @@
     }
 
     function renderUnconfigured(message) {
+      hideSortControl();
       content.innerHTML =
         '<div class="empty-state">' +
         escapeHtml(message || 'This extension has not been configured yet.') +
@@ -397,7 +421,30 @@
     }
 
     function renderError(message) {
+      hideSortControl();
       content.innerHTML = '<div class="error-state">' + escapeHtml(message) + '</div>';
+    }
+
+    function hideSortControl() {
+      document.querySelector('.sort-control').style.display = 'none';
+    }
+
+    function renderSortControl() {
+      const sel = document.getElementById('sortSelect');
+      sel.innerHTML = '<option value="">(worksheet order)</option>' +
+        lastFieldNames.map(f => '<option value="' + escapeHtml(f) + '">' + escapeHtml(f) + '</option>').join('');
+      sel.value = config.sortField || '';
+      const dirBtn = document.getElementById('sortDirBtn');
+      dirBtn.textContent = config.sortDirection === 'desc' ? '↓' : '↑';
+      dirBtn.disabled = !config.sortField;
+      document.querySelector('.sort-control').style.display = 'flex';
+    }
+
+    async function applySortChange(field, direction) {
+      config.sortField = field;
+      config.sortDirection = direction;
+      await persistConfig();
+      await loadAndRender();
     }
 
     function bindWorksheetEvents() {
@@ -458,6 +505,8 @@
       }
 
       document.getElementById('title').textContent = config.title || ('Creative Gallery — ' + config.worksheet);
+      lastFieldNames = fieldNames;
+      renderSortControl();
 
       if (table.totalRowCount === 0) {
         content.innerHTML = '<div class="empty-state">No creatives to show (check filters on "' + config.worksheet + '").</div>';
@@ -800,6 +849,13 @@
 
       document.getElementById('configureBtn').addEventListener('click', openConfigure);
       document.getElementById('clearBtn').addEventListener('click', () => onItemClick(selectedValue));
+      document.getElementById('sortSelect').addEventListener('change', e => {
+        applySortChange(e.target.value, config.sortDirection);
+      });
+      document.getElementById('sortDirBtn').addEventListener('click', () => {
+        if (!config.sortField) return;
+        applySortChange(config.sortField, config.sortDirection === 'desc' ? 'asc' : 'desc');
+      });
 
       content.addEventListener('click', e => {
         const item = e.target.closest('[data-value]');
