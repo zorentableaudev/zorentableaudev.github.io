@@ -72,9 +72,9 @@
       font-size: 11px;
       font-weight: 700;
       margin-bottom: 3px;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
+      white-space: normal;
+      overflow-wrap: break-word;
+      word-break: break-word;
     }
     .tile-metric {
       display: flex;
@@ -82,10 +82,10 @@
       gap: 6px;
       font-size: 10px;
       color: #444;
-      line-height: 1.5;
+      line-height: 1.4;
     }
-    .tile-metric .metric-label { color: #777; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-    .tile-metric .metric-value { font-weight: 600; white-space: nowrap; }
+    .tile-metric .metric-label { color: #777; white-space: normal; overflow-wrap: break-word; word-break: break-word; }
+    .tile-metric .metric-value { font-weight: 600; white-space: normal; overflow-wrap: break-word; word-break: break-word; text-align: right; }
 
     /* Table layout */
     table { border-collapse: collapse; width: 100%; table-layout: fixed; }
@@ -100,9 +100,9 @@
       text-transform: uppercase;
       letter-spacing: .3px;
       color: #555;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
+      white-space: normal;
+      overflow-wrap: break-word;
+      word-break: break-word;
     }
     thead th.draggable { cursor: grab; position: relative; }
     thead th.dragging { opacity: .5; }
@@ -119,9 +119,10 @@
     tbody td {
       padding: 4px 8px;
       border-bottom: 1px solid #eef0f3;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
+      white-space: normal;
+      overflow-wrap: break-word;
+      word-break: break-word;
+      vertical-align: top;
     }
     tr.row-item { cursor: pointer; }
     tr.row-item:hover td { background: #fafbfc; }
@@ -200,6 +201,7 @@
       filterField: '', sortField: '', sortDirection: 'asc', layout: 'card', columns: 4,
       rowHeight: '', imageHeight: 90, imageWidth: 60, displayFields: [], fieldAliases: {},
       targetWorksheets: [],
+      tooltip: { enabled: true, showImage: true, showTitle: true, fields: [] },
     };
     let columnWidths = {}; // { [field]: px } - table column widths, persisted separately
     let selectedValue = null;
@@ -262,6 +264,12 @@
         displayFields: Array.isArray(parsed.displayFields) ? parsed.displayFields : [],
         fieldAliases: (parsed.fieldAliases && typeof parsed.fieldAliases === 'object') ? parsed.fieldAliases : {},
         targetWorksheets: Array.isArray(parsed.targetWorksheets) ? parsed.targetWorksheets : [],
+        tooltip: {
+          enabled: !parsed.tooltip || parsed.tooltip.enabled !== false,
+          showImage: !parsed.tooltip || parsed.tooltip.showImage !== false,
+          showTitle: !parsed.tooltip || parsed.tooltip.showTitle !== false,
+          fields: (parsed.tooltip && Array.isArray(parsed.tooltip.fields)) ? parsed.tooltip.fields : [],
+        },
       };
       try { columnWidths = s.columnWidths ? JSON.parse(s.columnWidths) : {}; } catch (_) { columnWidths = {}; }
     }
@@ -314,7 +322,8 @@
       const filterIdx = fieldNames.indexOf(config.filterField);
       const titleIdx = config.titleField ? fieldNames.indexOf(config.titleField) : -1;
       const sortIdx = config.sortField ? fieldNames.indexOf(config.sortField) : -1;
-      const displayIdx = config.displayFields
+      const neededFields = Array.from(new Set([...config.displayFields, ...(config.tooltip.fields || [])]));
+      const displayIdx = neededFields
         .map(f => ({ field: f, idx: fieldNames.indexOf(f) }))
         .filter(d => d.idx !== -1);
 
@@ -403,7 +412,7 @@
 
       items.forEach(t => {
         const active = String(t.value) === String(selectedValue) ? ' active' : '';
-        const rowStyle = config.rowHeight ? ' style="height:' + config.rowHeight + 'px"' : '';
+        const rowStyle = config.rowHeight ? ' style="min-height:' + config.rowHeight + 'px"' : '';
         html += '<tr class="row-item' + active + '" data-value="' + escapeHtml(t.value) + '"' + rowStyle + '>' +
           '<td class="thumb-cell"><img src="' + escapeHtml(t.imageUrl) + '" alt="' + escapeHtml(t.title) +
           '" loading="lazy" style="width:' + config.imageWidth + 'px;height:' + config.imageHeight + 'px" onerror="this.classList.add(\'broken\')"></td>';
@@ -546,9 +555,15 @@
 
       if (lastHoverValue !== String(value)) {
         lastHoverValue = String(value);
-        let html = '<img src="' + escapeHtml(item.imageUrl) + '" onerror="this.style.display=\'none\'">';
-        if (config.titleField) html += '<div class="hp-title">' + escapeHtml(item.title) + '</div>';
-        config.displayFields.forEach(f => {
+        const fields = (config.tooltip.fields && config.tooltip.fields.length) ? config.tooltip.fields : config.displayFields;
+        let html = '';
+        if (config.tooltip.showImage) {
+          html += '<img src="' + escapeHtml(item.imageUrl) + '" onerror="this.style.display=\'none\'">';
+        }
+        if (config.tooltip.showTitle && config.titleField) {
+          html += '<div class="hp-title">' + escapeHtml(item.title) + '</div>';
+        }
+        fields.forEach(f => {
           html += '<div class="hp-metric"><span class="metric-label">' + escapeHtml(aliasFor(f)) +
             '</span><span class="metric-value">' + escapeHtml(item.metricsMap[f]) + '</span></div>';
         });
@@ -608,6 +623,7 @@
       });
 
       content.addEventListener('mousemove', e => {
+        if (!config.tooltip.enabled) return;
         const item = e.target.closest('[data-value]');
         if (!item) { hideHoverPreview(); return; }
         showHoverPreview(item.getAttribute('data-value'), e.clientX, e.clientY);

@@ -54,6 +54,13 @@
     }
     .box label.checkbox input { width: auto; }
 
+    label.checkbox-inline {
+      display: flex; align-items: center; gap: 6px;
+      font-size: 12px; font-weight: 400; text-transform: none; letter-spacing: 0;
+      color: #1a1a1a; margin: 8px 0; cursor: pointer;
+    }
+    label.checkbox-inline input { width: auto; }
+
     .order-list { border: 1px solid #e2e5e9; border-radius: 5px; }
     .order-item {
       display: flex; align-items: center; gap: 6px;
@@ -182,6 +189,17 @@
   <p class="hint">Use "Alias" to rename a header without renaming the underlying field.</p>
   <div class="order-list" id="orderList"></div>
 
+  <h2>Tooltip</h2>
+  <label class="checkbox-inline"><input type="checkbox" id="tooltipEnabled" checked> Show hover preview (enlarged image + details)</label>
+  <div id="tooltipOptions">
+    <div class="row">
+      <div><label class="checkbox-inline"><input type="checkbox" id="tooltipShowImage" checked> Show image</label></div>
+      <div><label class="checkbox-inline"><input type="checkbox" id="tooltipShowTitle" checked> Show title</label></div>
+    </div>
+    <p class="hint">Fields to include (leave all unchecked to mirror the metrics shown above)</p>
+    <div class="box" id="tooltipChecklist"></div>
+  </div>
+
   <h2>Sheets to filter when a creative is clicked</h2>
   <div class="box" id="targetChecklist"></div>
 
@@ -212,6 +230,10 @@
     let fieldAliases = {};
     let targetWorksheets = [];
     let editingField = null;
+    let tooltipEnabled = true;
+    let tooltipShowImage = true;
+    let tooltipShowTitle = true;
+    let tooltipFields = [];
 
     function showError(msg) { document.getElementById('error').textContent = msg || ''; }
 
@@ -248,6 +270,20 @@
       }).join('') || '<span class="hint">No other fields on this worksheet.</span>';
     }
 
+    function renderTooltipChecklist() {
+      const box = document.getElementById('tooltipChecklist');
+      const candidates = fieldNames.filter(f => f !== imageField);
+      box.innerHTML = candidates.map(f => {
+        const checked = tooltipFields.includes(f);
+        return '<label class="checkbox"><input type="checkbox" data-tooltip-field="' + escapeHtml(f) +
+          '" ' + (checked ? 'checked' : '') + '>' + escapeHtml(f) + '</label>';
+      }).join('') || '<span class="hint">No other fields on this worksheet.</span>';
+    }
+
+    function updateTooltipOptionsVisibility() {
+      document.getElementById('tooltipOptions').style.display = tooltipEnabled ? '' : 'none';
+    }
+
     function renderOrderList() {
       const list = document.getElementById('orderList');
       if (!displayFields.length) {
@@ -255,9 +291,12 @@
         return;
       }
       list.innerHTML = displayFields.map((f, i) => {
+        const atTop = i === 0, atBottom = i === displayFields.length - 1;
         let row = '<div class="order-item">' +
-          '<button type="button" data-action="up" data-index="' + i + '" ' + (i === 0 ? 'disabled' : '') + '>&uarr;</button>' +
-          '<button type="button" data-action="down" data-index="' + i + '" ' + (i === displayFields.length - 1 ? 'disabled' : '') + '>&darr;</button>' +
+          '<button type="button" data-action="top" data-index="' + i + '" title="Move to top" ' + (atTop ? 'disabled' : '') + '>&#8607;&#8607;</button>' +
+          '<button type="button" data-action="up" data-index="' + i + '" title="Move up" ' + (atTop ? 'disabled' : '') + '>&uarr;</button>' +
+          '<button type="button" data-action="down" data-index="' + i + '" title="Move down" ' + (atBottom ? 'disabled' : '') + '>&darr;</button>' +
+          '<button type="button" data-action="bottom" data-index="' + i + '" title="Move to last" ' + (atBottom ? 'disabled' : '') + '>&#8609;&#8609;</button>' +
           '<span class="label">' + escapeHtml(fieldAliases[f] || f) + '</span>' +
           '<button type="button" data-action="edit" data-field="' + escapeHtml(f) + '">Alias</button>' +
           '</div>';
@@ -305,12 +344,16 @@
       filterField = document.getElementById('filterField').value;
       sortField = document.getElementById('sortField').value;
 
-      if (!preserve) { targetWorksheets = []; displayFields = []; fieldAliases = {}; }
-      else { displayFields = displayFields.filter(f => fieldNames.includes(f) && f !== imageField); }
+      if (!preserve) { targetWorksheets = []; displayFields = []; fieldAliases = {}; tooltipFields = []; }
+      else {
+        displayFields = displayFields.filter(f => fieldNames.includes(f) && f !== imageField);
+        tooltipFields = tooltipFields.filter(f => fieldNames.includes(f) && f !== imageField);
+      }
 
       renderTargetChecklist();
       renderFieldChecklist();
       renderOrderList();
+      renderTooltipChecklist();
       updateSaveEnabled();
     }
 
@@ -348,6 +391,11 @@
       displayFields = Array.isArray(existing && existing.displayFields) ? existing.displayFields : [];
       fieldAliases = (existing && existing.fieldAliases && typeof existing.fieldAliases === 'object') ? existing.fieldAliases : {};
       targetWorksheets = (existing && existing.targetWorksheets) || [];
+      const t = (existing && existing.tooltip) || {};
+      tooltipEnabled = t.enabled !== false;
+      tooltipShowImage = t.showImage !== false;
+      tooltipShowTitle = t.showTitle !== false;
+      tooltipFields = Array.isArray(t.fields) ? t.fields : [];
 
       document.getElementById('extTitle').value = title;
       document.getElementById('imageAlias').value = imageAlias;
@@ -358,7 +406,11 @@
       document.getElementById('rowHeight').value = rowHeight;
       document.getElementById('imageHeight').value = imageHeight;
       document.getElementById('imageWidth').value = imageWidth;
+      document.getElementById('tooltipEnabled').checked = tooltipEnabled;
+      document.getElementById('tooltipShowImage').checked = tooltipShowImage;
+      document.getElementById('tooltipShowTitle').checked = tooltipShowTitle;
       updateSizingVisibility();
+      updateTooltipOptionsVisibility();
 
       await onWorksheetChange(true);
 
@@ -369,8 +421,10 @@
       document.getElementById('imageField').addEventListener('change', e => {
         imageField = e.target.value;
         displayFields = displayFields.filter(f => f !== imageField);
+        tooltipFields = tooltipFields.filter(f => f !== imageField);
         renderFieldChecklist();
         renderOrderList();
+        renderTooltipChecklist();
         updateSaveEnabled();
       });
       document.getElementById('titleField').addEventListener('change', e => { titleField = e.target.value; });
@@ -394,6 +448,21 @@
         const n = parseInt(e.target.value, 10);
         imageWidth = Number.isFinite(n) ? n : 60;
       });
+      document.getElementById('tooltipEnabled').addEventListener('change', e => {
+        tooltipEnabled = e.target.checked;
+        updateTooltipOptionsVisibility();
+      });
+      document.getElementById('tooltipShowImage').addEventListener('change', e => { tooltipShowImage = e.target.checked; });
+      document.getElementById('tooltipShowTitle').addEventListener('change', e => { tooltipShowTitle = e.target.checked; });
+      document.getElementById('tooltipChecklist').addEventListener('change', e => {
+        const field = e.target.getAttribute('data-tooltip-field');
+        if (field == null) return;
+        if (e.target.checked) {
+          if (!tooltipFields.includes(field)) tooltipFields.push(field);
+        } else {
+          tooltipFields = tooltipFields.filter(f => f !== field);
+        }
+      });
 
       document.getElementById('fieldChecklist').addEventListener('change', e => {
         const field = e.target.getAttribute('data-field');
@@ -415,6 +484,12 @@
           const j = action === 'up' ? index - 1 : index + 1;
           if (j < 0 || j >= displayFields.length) return;
           [displayFields[index], displayFields[j]] = [displayFields[j], displayFields[index]];
+          renderOrderList();
+        } else if (action === 'top' || action === 'bottom') {
+          const index = parseInt(e.target.getAttribute('data-index'), 10);
+          const [field] = displayFields.splice(index, 1);
+          if (action === 'top') displayFields.unshift(field);
+          else displayFields.push(field);
           renderOrderList();
         } else if (action === 'edit') {
           const field = e.target.getAttribute('data-field');
@@ -466,6 +541,12 @@
           displayFields,
           fieldAliases,
           targetWorksheets,
+          tooltip: {
+            enabled: tooltipEnabled,
+            showImage: tooltipShowImage,
+            showTitle: tooltipShowTitle,
+            fields: tooltipFields,
+          },
         }));
       });
 
