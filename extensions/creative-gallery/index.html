@@ -162,7 +162,9 @@
       box-shadow: 0 4px 16px rgba(0,0,0,.18);
       padding: 8px;
       display: none;
-      max-width: 280px;
+      max-width: 320px;
+      font-size: 12px;
+      line-height: 1.5;
     }
     #hoverPreview img {
       display: block;
@@ -172,9 +174,6 @@
       background: #eef0f3;
       border-radius: 4px;
     }
-    #hoverPreview .hp-title { font-size: 12px; font-weight: 700; margin-top: 6px; }
-    #hoverPreview .hp-metric { display: flex; justify-content: space-between; gap: 10px; font-size: 11px; color: #444; line-height: 1.5; }
-    #hoverPreview .hp-metric .metric-label { color: #777; }
   </style>
 </head>
 <body>
@@ -201,7 +200,7 @@
       filterField: '', sortField: '', sortDirection: 'asc', layout: 'card', columns: 4,
       rowHeight: '', imageHeight: 90, imageWidth: 60, displayFields: [], fieldAliases: {},
       targetWorksheets: [],
-      tooltip: { enabled: true, showImage: true, showTitle: true, fields: [] },
+      tooltip: { enabled: true, template: '' },
     };
     let columnWidths = {}; // { [field]: px } - table column widths, persisted separately
     let selectedValue = null;
@@ -266,11 +265,28 @@
         targetWorksheets: Array.isArray(parsed.targetWorksheets) ? parsed.targetWorksheets : [],
         tooltip: {
           enabled: !parsed.tooltip || parsed.tooltip.enabled !== false,
-          showImage: !parsed.tooltip || parsed.tooltip.showImage !== false,
-          showTitle: !parsed.tooltip || parsed.tooltip.showTitle !== false,
-          fields: (parsed.tooltip && Array.isArray(parsed.tooltip.fields)) ? parsed.tooltip.fields : [],
+          template: (parsed.tooltip && typeof parsed.tooltip.template === 'string') ? parsed.tooltip.template : '',
         },
       };
+      if (!config.tooltip.template && parsed.tooltip &&
+          (parsed.tooltip.showImage !== undefined || parsed.tooltip.showTitle !== undefined || Array.isArray(parsed.tooltip.fields))) {
+        // Migrate settings saved under the older checkbox-based tooltip config.
+        const t = parsed.tooltip;
+        let html = '';
+        if (t.showImage !== false && config.imageField) {
+          html += '<div><span class="tt-field-image" data-tt-image="1">[Image]</span></div>';
+        }
+        if (t.showTitle !== false && config.titleField) {
+          html += '<div><b><span data-tt-field="' + escapeHtml(config.titleField) + '">&lt;' +
+            escapeHtml(config.titleField) + '&gt;</span></b></div>';
+        }
+        const fields = (Array.isArray(t.fields) && t.fields.length) ? t.fields : config.displayFields;
+        fields.forEach(f => {
+          html += '<div>' + escapeHtml(aliasFor(f)) + ': <span data-tt-field="' + escapeHtml(f) +
+            '">&lt;' + escapeHtml(f) + '&gt;</span></div>';
+        });
+        config.tooltip.template = html;
+      }
       try { columnWidths = s.columnWidths ? JSON.parse(s.columnWidths) : {}; } catch (_) { columnWidths = {}; }
     }
 
@@ -322,7 +338,17 @@
       const filterIdx = fieldNames.indexOf(config.filterField);
       const titleIdx = config.titleField ? fieldNames.indexOf(config.titleField) : -1;
       const sortIdx = config.sortField ? fieldNames.indexOf(config.sortField) : -1;
-      const neededFields = Array.from(new Set([...config.displayFields, ...(config.tooltip.fields || [])]));
+      const templateFields = [];
+      {
+        const re = /data-tt-field="([^"]+)"/g;
+        let m;
+        while ((m = re.exec(config.tooltip.template || '')) !== null) templateFields.push(m[1]);
+      }
+      const neededFields = Array.from(new Set([
+        ...config.displayFields,
+        ...(config.titleField ? [config.titleField] : []),
+        ...templateFields,
+      ]));
       const displayIdx = neededFields
         .map(f => ({ field: f, idx: fieldNames.indexOf(f) }))
         .filter(d => d.idx !== -1);
@@ -544,6 +570,19 @@
       e.preventDefault();
     }
 
+    function renderTooltipHtml(item) {
+      let html = config.tooltip.template || '';
+      html = html.replace(/<span[^>]*data-tt-image="[^"]*"[^>]*>.*?<\/span>/g, () => {
+        if (!item.imageUrl) return '';
+        return '<img src="' + escapeHtml(item.imageUrl) +
+          '" style="max-width:260px;max-height:200px;object-fit:contain;display:block;border-radius:4px;background:#eef0f3;" onerror="this.style.display=\'none\'">';
+      });
+      html = html.replace(/<span[^>]*data-tt-field="([^"]+)"[^>]*>.*?<\/span>/g, (m, field) => {
+        return escapeHtml(item.metricsMap[field] == null ? '' : item.metricsMap[field]);
+      });
+      return html;
+    }
+
     function hideHoverPreview() {
       hoverPreview.style.display = 'none';
       lastHoverValue = null;
@@ -555,19 +594,7 @@
 
       if (lastHoverValue !== String(value)) {
         lastHoverValue = String(value);
-        const fields = (config.tooltip.fields && config.tooltip.fields.length) ? config.tooltip.fields : config.displayFields;
-        let html = '';
-        if (config.tooltip.showImage) {
-          html += '<img src="' + escapeHtml(item.imageUrl) + '" onerror="this.style.display=\'none\'">';
-        }
-        if (config.tooltip.showTitle && config.titleField) {
-          html += '<div class="hp-title">' + escapeHtml(item.title) + '</div>';
-        }
-        fields.forEach(f => {
-          html += '<div class="hp-metric"><span class="metric-label">' + escapeHtml(aliasFor(f)) +
-            '</span><span class="metric-value">' + escapeHtml(item.metricsMap[f]) + '</span></div>';
-        });
-        hoverPreview.innerHTML = html;
+        hoverPreview.innerHTML = renderTooltipHtml(item);
       }
 
       hoverPreview.style.display = 'block';

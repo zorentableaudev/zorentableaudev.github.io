@@ -81,6 +81,31 @@
       padding: 8px;
     }
 
+    .tt-toolbar {
+      display: flex; flex-wrap: wrap; gap: 4px; align-items: center;
+      border: 1px solid #e2e5e9; border-bottom: none; border-radius: 5px 5px 0 0;
+      padding: 6px; background: #f9fafb;
+    }
+    .tt-toolbar button {
+      background: #fff; border: 1px solid #ccd1d9; border-radius: 3px;
+      width: 26px; height: 26px; cursor: pointer; font-size: 12px;
+    }
+    .tt-toolbar button:hover { background: #eef2f7; }
+    .tt-toolbar button#ttInsertImage, .tt-toolbar button#ttReset { width: auto; padding: 0 8px; font-size: 11px; }
+    .tt-toolbar select, .tt-toolbar input[type=color] {
+      padding: 3px 4px; border: 1px solid #ccd1d9; border-radius: 3px; font-size: 11px; width: auto;
+    }
+    .tt-editor {
+      border: 1px solid #e2e5e9; border-radius: 0 0 5px 5px;
+      min-height: 110px; max-height: 220px; overflow-y: auto;
+      padding: 8px; font-size: 12px; line-height: 1.5; outline: none; background: #fff;
+    }
+    .tt-editor .tt-field {
+      display: inline-block; background: #eaf2fb; color: #1e6eb5;
+      border-radius: 3px; padding: 0 4px; font-size: 11px; margin: 0 1px; cursor: default;
+    }
+    .tt-editor .tt-field-image { background: #eafbf0; color: #1a8a4a; }
+
     .actions {
       margin-top: 20px;
       display: flex;
@@ -190,14 +215,30 @@
   <div class="order-list" id="orderList"></div>
 
   <h2>Tooltip</h2>
-  <label class="checkbox-inline"><input type="checkbox" id="tooltipEnabled" checked> Show hover preview (enlarged image + details)</label>
+  <label class="checkbox-inline"><input type="checkbox" id="tooltipEnabled" checked> Show hover preview</label>
   <div id="tooltipOptions">
-    <div class="row">
-      <div><label class="checkbox-inline"><input type="checkbox" id="tooltipShowImage" checked> Show image</label></div>
-      <div><label class="checkbox-inline"><input type="checkbox" id="tooltipShowTitle" checked> Show title</label></div>
+    <p class="hint">Formatted the same way as Tableau's own "Edit Tooltip" editor: type text, format it with the
+      toolbar, and use "Insert field" or "Insert image" to drop in a live value that's filled in per creative.</p>
+    <div class="tt-toolbar">
+      <button type="button" data-cmd="bold" title="Bold"><b>B</b></button>
+      <button type="button" data-cmd="italic" title="Italic"><i>I</i></button>
+      <button type="button" data-cmd="underline" title="Underline"><u>U</u></button>
+      <select id="ttFontSize" title="Font size">
+        <option value="2">Small</option>
+        <option value="3" selected>Normal</option>
+        <option value="4">Medium</option>
+        <option value="5">Large</option>
+        <option value="6">X-Large</option>
+      </select>
+      <input type="color" id="ttColor" title="Text color" value="#1a1a1a">
+      <button type="button" data-cmd="justifyLeft" title="Align left">&#8676;</button>
+      <button type="button" data-cmd="justifyCenter" title="Align center">&#8596;</button>
+      <button type="button" data-cmd="justifyRight" title="Align right">&#8677;</button>
+      <select id="ttInsertField" title="Insert field"><option value="">Insert field...</option></select>
+      <button type="button" id="ttInsertImage">Insert image</button>
+      <button type="button" id="ttReset">Reset to default</button>
     </div>
-    <p class="hint">Fields to include (leave all unchecked to mirror the metrics shown above)</p>
-    <div class="box" id="tooltipChecklist"></div>
+    <div class="tt-editor" id="ttEditor" contenteditable="true"></div>
   </div>
 
   <h2>Sheets to filter when a creative is clicked</h2>
@@ -231,9 +272,7 @@
     let targetWorksheets = [];
     let editingField = null;
     let tooltipEnabled = true;
-    let tooltipShowImage = true;
-    let tooltipShowTitle = true;
-    let tooltipFields = [];
+    let tooltipTemplate = '';
 
     function showError(msg) { document.getElementById('error').textContent = msg || ''; }
 
@@ -270,18 +309,37 @@
       }).join('') || '<span class="hint">No other fields on this worksheet.</span>';
     }
 
-    function renderTooltipChecklist() {
-      const box = document.getElementById('tooltipChecklist');
-      const candidates = fieldNames.filter(f => f !== imageField);
-      box.innerHTML = candidates.map(f => {
-        const checked = tooltipFields.includes(f);
-        return '<label class="checkbox"><input type="checkbox" data-tooltip-field="' + escapeHtml(f) +
-          '" ' + (checked ? 'checked' : '') + '>' + escapeHtml(f) + '</label>';
-      }).join('') || '<span class="hint">No other fields on this worksheet.</span>';
-    }
-
     function updateTooltipOptionsVisibility() {
       document.getElementById('tooltipOptions').style.display = tooltipEnabled ? '' : 'none';
+    }
+
+    function fieldChip(field) {
+      return '<span class="tt-field" data-tt-field="' + escapeHtml(field) + '" contenteditable="false">&lt;' +
+        escapeHtml(field) + '&gt;</span>';
+    }
+
+    function imageChip() {
+      return '<span class="tt-field tt-field-image" data-tt-image="1" contenteditable="false">[Image]</span>';
+    }
+
+    function buildDefaultTemplate() {
+      let html = '';
+      if (imageField) html += '<div>' + imageChip() + '</div>';
+      if (titleField) html += '<div><b>' + fieldChip(titleField) + '</b></div>';
+      displayFields.forEach(f => {
+        html += '<div>' + escapeHtml(fieldAliases[f] || f) + ': ' + fieldChip(f) + '</div>';
+      });
+      return html;
+    }
+
+    function renderInsertFieldOptions() {
+      const sel = document.getElementById('ttInsertField');
+      sel.innerHTML = '<option value="">Insert field...</option>' +
+        fieldNames.map(f => '<option value="' + escapeHtml(f) + '">' + escapeHtml(f) + '</option>').join('');
+    }
+
+    function syncTooltipTemplateFromEditor() {
+      tooltipTemplate = document.getElementById('ttEditor').innerHTML;
     }
 
     function renderOrderList() {
@@ -344,16 +402,15 @@
       filterField = document.getElementById('filterField').value;
       sortField = document.getElementById('sortField').value;
 
-      if (!preserve) { targetWorksheets = []; displayFields = []; fieldAliases = {}; tooltipFields = []; }
-      else {
-        displayFields = displayFields.filter(f => fieldNames.includes(f) && f !== imageField);
-        tooltipFields = tooltipFields.filter(f => fieldNames.includes(f) && f !== imageField);
-      }
+      if (!preserve) { targetWorksheets = []; displayFields = []; fieldAliases = {}; }
+      else { displayFields = displayFields.filter(f => fieldNames.includes(f) && f !== imageField); }
 
       renderTargetChecklist();
       renderFieldChecklist();
       renderOrderList();
-      renderTooltipChecklist();
+      renderInsertFieldOptions();
+      if (!preserve) tooltipTemplate = buildDefaultTemplate();
+      document.getElementById('ttEditor').innerHTML = tooltipTemplate;
       updateSaveEnabled();
     }
 
@@ -393,9 +450,19 @@
       targetWorksheets = (existing && existing.targetWorksheets) || [];
       const t = (existing && existing.tooltip) || {};
       tooltipEnabled = t.enabled !== false;
-      tooltipShowImage = t.showImage !== false;
-      tooltipShowTitle = t.showTitle !== false;
-      tooltipFields = Array.isArray(t.fields) ? t.fields : [];
+      if (typeof t.template === 'string' && t.template) {
+        tooltipTemplate = t.template;
+      } else if (t.showImage !== undefined || t.showTitle !== undefined || Array.isArray(t.fields)) {
+        // Migrate the older checkbox-based tooltip config to an equivalent template.
+        let html = '';
+        if (t.showImage !== false && imageField) html += '<div>' + imageChip() + '</div>';
+        if (t.showTitle !== false && titleField) html += '<div><b>' + fieldChip(titleField) + '</b></div>';
+        const fields = (Array.isArray(t.fields) && t.fields.length) ? t.fields : displayFields;
+        fields.forEach(f => { html += '<div>' + escapeHtml(fieldAliases[f] || f) + ': ' + fieldChip(f) + '</div>'; });
+        tooltipTemplate = html;
+      } else {
+        tooltipTemplate = '';
+      }
 
       document.getElementById('extTitle').value = title;
       document.getElementById('imageAlias').value = imageAlias;
@@ -407,12 +474,14 @@
       document.getElementById('imageHeight').value = imageHeight;
       document.getElementById('imageWidth').value = imageWidth;
       document.getElementById('tooltipEnabled').checked = tooltipEnabled;
-      document.getElementById('tooltipShowImage').checked = tooltipShowImage;
-      document.getElementById('tooltipShowTitle').checked = tooltipShowTitle;
       updateSizingVisibility();
       updateTooltipOptionsVisibility();
 
       await onWorksheetChange(true);
+      if (!tooltipTemplate) {
+        tooltipTemplate = buildDefaultTemplate();
+        document.getElementById('ttEditor').innerHTML = tooltipTemplate;
+      }
 
       document.getElementById('extTitle').addEventListener('input', e => { title = e.target.value; });
       document.getElementById('imageAlias').addEventListener('input', e => { imageAlias = e.target.value; });
@@ -421,10 +490,8 @@
       document.getElementById('imageField').addEventListener('change', e => {
         imageField = e.target.value;
         displayFields = displayFields.filter(f => f !== imageField);
-        tooltipFields = tooltipFields.filter(f => f !== imageField);
         renderFieldChecklist();
         renderOrderList();
-        renderTooltipChecklist();
         updateSaveEnabled();
       });
       document.getElementById('titleField').addEventListener('change', e => { titleField = e.target.value; });
@@ -452,17 +519,44 @@
         tooltipEnabled = e.target.checked;
         updateTooltipOptionsVisibility();
       });
-      document.getElementById('tooltipShowImage').addEventListener('change', e => { tooltipShowImage = e.target.checked; });
-      document.getElementById('tooltipShowTitle').addEventListener('change', e => { tooltipShowTitle = e.target.checked; });
-      document.getElementById('tooltipChecklist').addEventListener('change', e => {
-        const field = e.target.getAttribute('data-tooltip-field');
-        if (field == null) return;
-        if (e.target.checked) {
-          if (!tooltipFields.includes(field)) tooltipFields.push(field);
-        } else {
-          tooltipFields = tooltipFields.filter(f => f !== field);
-        }
+
+      const ttEditor = document.getElementById('ttEditor');
+      document.querySelectorAll('.tt-toolbar button[data-cmd]').forEach(btn => {
+        btn.addEventListener('click', () => {
+          ttEditor.focus();
+          document.execCommand(btn.getAttribute('data-cmd'), false, null);
+          syncTooltipTemplateFromEditor();
+        });
       });
+      document.getElementById('ttFontSize').addEventListener('change', e => {
+        ttEditor.focus();
+        document.execCommand('fontSize', false, e.target.value);
+        syncTooltipTemplateFromEditor();
+      });
+      document.getElementById('ttColor').addEventListener('input', e => {
+        ttEditor.focus();
+        document.execCommand('foreColor', false, e.target.value);
+        syncTooltipTemplateFromEditor();
+      });
+      document.getElementById('ttInsertField').addEventListener('change', e => {
+        const field = e.target.value;
+        if (!field) return;
+        ttEditor.focus();
+        document.execCommand('insertHTML', false, fieldChip(field) + '&nbsp;');
+        syncTooltipTemplateFromEditor();
+        e.target.value = '';
+      });
+      document.getElementById('ttInsertImage').addEventListener('click', () => {
+        if (!imageField) return;
+        ttEditor.focus();
+        document.execCommand('insertHTML', false, imageChip() + '<br>');
+        syncTooltipTemplateFromEditor();
+      });
+      document.getElementById('ttReset').addEventListener('click', () => {
+        tooltipTemplate = buildDefaultTemplate();
+        ttEditor.innerHTML = tooltipTemplate;
+      });
+      ttEditor.addEventListener('input', syncTooltipTemplateFromEditor);
 
       document.getElementById('fieldChecklist').addEventListener('change', e => {
         const field = e.target.getAttribute('data-field');
@@ -543,9 +637,7 @@
           targetWorksheets,
           tooltip: {
             enabled: tooltipEnabled,
-            showImage: tooltipShowImage,
-            showTitle: tooltipShowTitle,
-            fields: tooltipFields,
+            template: tooltipTemplate,
           },
         }));
       });
