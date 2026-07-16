@@ -300,16 +300,35 @@
   <div id="tooltipOptions">
     <p class="hint">Formatted the same way as Tableau's own "Edit Tooltip" editor: type text, format it with the
       toolbar, and use "Insert field" or "Insert image" to drop in a live value that's filled in per creative.</p>
+    <div class="row">
+      <div>
+        <label for="ttColumns">Columns</label>
+        <select id="ttColumns">
+          <option value="1">1</option>
+          <option value="2">2</option>
+          <option value="3">3</option>
+          <option value="4">4</option>
+        </select>
+      </div>
+      <div>
+        <label for="ttWidth">Window width (px)</label>
+        <input type="number" id="ttWidth" min="150" max="800" value="280">
+      </div>
+      <div>
+        <label for="ttMaxHeight">Window max height (px)</label>
+        <input type="number" id="ttMaxHeight" min="100" max="800" value="360">
+      </div>
+    </div>
     <div class="tt-toolbar">
       <button type="button" data-cmd="bold" title="Bold"><b>B</b></button>
       <button type="button" data-cmd="italic" title="Italic"><i>I</i></button>
       <button type="button" data-cmd="underline" title="Underline"><u>U</u></button>
       <select id="ttFontSize" title="Font size">
-        <option value="2">Small</option>
-        <option value="3" selected>Normal</option>
-        <option value="4">Medium</option>
-        <option value="5">Large</option>
-        <option value="6">X-Large</option>
+        <option value="8">8px</option>
+        <option value="9">9px</option>
+        <option value="10">10px</option>
+        <option value="11">11px</option>
+        <option value="12" selected>12px</option>
       </select>
       <input type="color" id="ttColor" title="Text color" value="#1a1a1a">
       <button type="button" data-cmd="justifyLeft" title="Align left">&#8676;</button>
@@ -355,6 +374,9 @@
     let editingField = null;
     let tooltipEnabled = true;
     let tooltipTemplate = '';
+    let tooltipColumns = 1;
+    let tooltipWidth = 280;
+    let tooltipMaxHeight = 360;
     let rowColorEnabled = false;
     let rowColorField = '';
     let rowColorOperator = '>';
@@ -419,6 +441,19 @@
       return '<span class="tt-field tt-field-image" data-tt-image="1" contenteditable="false">[Image]</span>';
     }
 
+    // document.execCommand('fontSize', ...) only accepts legacy size levels (1-7), not exact
+    // px - the standard workaround is to mark the selection with the rarely-used level 7,
+    // then swap the resulting <font size="7"> for a <span style="font-size:Npx"> ourselves.
+    function applyExactFontSize(px) {
+      document.execCommand('fontSize', false, '7');
+      document.getElementById('ttEditor').querySelectorAll('font[size="7"]').forEach(el => {
+        const span = document.createElement('span');
+        span.style.fontSize = px + 'px';
+        while (el.firstChild) span.appendChild(el.firstChild);
+        el.replaceWith(span);
+      });
+    }
+
     function buildDefaultTemplate() {
       let html = '';
       if (imageField) html += '<div>' + imageChip() + '</div>';
@@ -448,10 +483,10 @@
       list.innerHTML = displayFields.map((f, i) => {
         const atTop = i === 0, atBottom = i === displayFields.length - 1;
         let row = '<div class="order-item" data-field="' + escapeHtml(f) + '">' +
-          '<button type="button" data-action="top" data-index="' + i + '" title="Skip to first" ' + (atTop ? 'disabled' : '') + '>&#9650;</button>' +
+          '<button type="button" data-action="top" data-index="' + i + '" title="Move to first" ' + (atTop ? 'disabled' : '') + '>&#10514;</button>' +
           '<button type="button" data-action="up" data-index="' + i + '" title="Move up" ' + (atTop ? 'disabled' : '') + '>&uarr;</button>' +
           '<button type="button" data-action="down" data-index="' + i + '" title="Move down" ' + (atBottom ? 'disabled' : '') + '>&darr;</button>' +
-          '<button type="button" data-action="bottom" data-index="' + i + '" title="Skip to last" ' + (atBottom ? 'disabled' : '') + '>&#9660;</button>' +
+          '<button type="button" data-action="bottom" data-index="' + i + '" title="Move to last" ' + (atBottom ? 'disabled' : '') + '>&#10515;</button>' +
           '<span class="label">' + escapeHtml(fieldAliases[f] || f) + '</span>' +
           '<button type="button" data-action="edit" data-field="' + escapeHtml(f) + '">Alias</button>' +
           '<button type="button" class="remove" data-action="remove" data-field="' + escapeHtml(f) + '" title="Remove field">Remove</button>' +
@@ -577,6 +612,9 @@
       bodyUnderline = !!st.bodyUnderline;
       const t = (existing && existing.tooltip) || {};
       tooltipEnabled = t.enabled !== false;
+      tooltipColumns = t.columns || 1;
+      tooltipWidth = t.width || 280;
+      tooltipMaxHeight = t.maxHeight || 360;
       if (typeof t.template === 'string' && t.template) {
         tooltipTemplate = t.template;
       } else if (t.showImage !== undefined || t.showTitle !== undefined || Array.isArray(t.fields)) {
@@ -602,6 +640,9 @@
       document.getElementById('imageWidth').value = imageWidth;
       document.getElementById('imageCellPadding').value = imageCellPadding;
       document.getElementById('tooltipEnabled').checked = tooltipEnabled;
+      document.getElementById('ttColumns').value = tooltipColumns;
+      document.getElementById('ttWidth').value = tooltipWidth;
+      document.getElementById('ttMaxHeight').value = tooltipMaxHeight;
       document.getElementById('rowColorEnabled').checked = rowColorEnabled;
       document.getElementById('rowColorOperator').value = rowColorOperator;
       document.getElementById('rowColorThreshold').value = rowColorThreshold;
@@ -701,8 +742,17 @@
       });
       document.getElementById('ttFontSize').addEventListener('change', e => {
         ttEditor.focus();
-        document.execCommand('fontSize', false, e.target.value);
+        applyExactFontSize(e.target.value);
         syncTooltipTemplateFromEditor();
+      });
+      document.getElementById('ttColumns').addEventListener('change', e => { tooltipColumns = parseInt(e.target.value, 10) || 1; });
+      document.getElementById('ttWidth').addEventListener('input', e => {
+        const n = parseInt(e.target.value, 10);
+        tooltipWidth = Number.isFinite(n) ? n : 280;
+      });
+      document.getElementById('ttMaxHeight').addEventListener('input', e => {
+        const n = parseInt(e.target.value, 10);
+        tooltipMaxHeight = Number.isFinite(n) ? n : 360;
       });
       document.getElementById('ttColor').addEventListener('input', e => {
         ttEditor.focus();
@@ -822,6 +872,9 @@
           tooltip: {
             enabled: tooltipEnabled,
             template: tooltipTemplate,
+            columns: tooltipColumns,
+            width: tooltipWidth,
+            maxHeight: tooltipMaxHeight,
           },
           rowColor: {
             enabled: rowColorEnabled,

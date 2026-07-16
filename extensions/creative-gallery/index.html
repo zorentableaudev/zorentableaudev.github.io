@@ -169,12 +169,14 @@
       box-shadow: 0 4px 16px rgba(0,0,0,.18);
       padding: 8px;
       display: none;
-      max-width: 320px;
       font-size: 12px;
       line-height: 1.5;
     }
+    #hoverPreview .tt-columns { column-gap: 12px; }
+    #hoverPreview .tt-columns > div { break-inside: avoid; -webkit-column-break-inside: avoid; }
     #hoverPreview img {
       display: block;
+      margin: 0 auto;
       max-width: 260px;
       max-height: 200px;
       object-fit: contain;
@@ -207,7 +209,7 @@
       filterField: '', sortField: '', sortDirection: 'asc', layout: 'card', columns: 4,
       rowHeight: '', imageHeight: 90, imageWidth: 60, imageCellPadding: 16, displayFields: [], fieldAliases: {},
       targetWorksheets: [],
-      tooltip: { enabled: true, template: '' },
+      tooltip: { enabled: true, template: '', columns: 1, width: 280, maxHeight: 360 },
       rowColor: { enabled: false, field: '', operator: '>', threshold: 0, trueColor: '#d4edda', falseColor: '#f8d7da' },
       style: {
         fontFamily: '', fontSize: 12, textColor: '#1a1a1a',
@@ -313,6 +315,9 @@
         tooltip: {
           enabled: !parsed.tooltip || parsed.tooltip.enabled !== false,
           template: (parsed.tooltip && typeof parsed.tooltip.template === 'string') ? parsed.tooltip.template : '',
+          columns: (parsed.tooltip && parsed.tooltip.columns) || 1,
+          width: (parsed.tooltip && parsed.tooltip.width) || 280,
+          maxHeight: (parsed.tooltip && parsed.tooltip.maxHeight) || 360,
         },
         rowColor: {
           enabled: !!(parsed.rowColor && parsed.rowColor.enabled),
@@ -680,7 +685,9 @@
       html = html.replace(/<span[^>]*data-tt-field="([^"]+)"[^>]*>.*?<\/span>/g, (m, field) => {
         return escapeHtml(item.metricsMap[field] == null ? '' : item.metricsMap[field]);
       });
-      return html;
+      const cols = Math.max(1, Math.min(4, config.tooltip.columns || 1));
+      const colStyle = cols > 1 ? 'column-count:' + cols + ';' : '';
+      return '<div class="tt-columns" style="' + colStyle + '">' + html + '</div>';
     }
 
     function hideHoverPreview() {
@@ -697,6 +704,9 @@
         hoverPreview.innerHTML = renderTooltipHtml(item);
       }
 
+      hoverPreview.style.width = (config.tooltip.width || 280) + 'px';
+      hoverPreview.style.maxHeight = (config.tooltip.maxHeight || 360) + 'px';
+      hoverPreview.style.overflowY = 'auto';
       hoverPreview.style.display = 'block';
       const pad = 16;
       let left = x + pad;
