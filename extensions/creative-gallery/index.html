@@ -172,11 +172,20 @@
       font-size: 12px;
       line-height: 1.5;
     }
+    /* Image (+ whatever line immediately follows it in the template) is hoisted out of the
+       column flow so it always sits centered above everything else, never side-by-side
+       with a later column's text. */
+    #hoverPreview .tt-header {
+      text-align: center;
+      margin-bottom: 8px;
+      padding-bottom: 8px;
+      border-bottom: 1px solid #eef0f3;
+    }
     #hoverPreview .tt-columns { column-gap: 12px; }
     #hoverPreview .tt-columns > div { break-inside: avoid; -webkit-column-break-inside: avoid; }
     #hoverPreview img {
       display: block;
-      margin: 0 auto;
+      margin: 0 auto 6px;
       max-width: 260px;
       max-height: 200px;
       object-fit: contain;
@@ -685,9 +694,36 @@
       html = html.replace(/<span[^>]*data-tt-field="([^"]+)"[^>]*>.*?<\/span>/g, (m, field) => {
         return escapeHtml(item.metricsMap[field] == null ? '' : item.metricsMap[field]);
       });
+
+      // Pull the image - and whatever line immediately follows it in the template (typically
+      // its name/title) - out of the column flow so it always renders as a centered header
+      // above everything else, never running in parallel with a later column's text.
+      const container = document.createElement('div');
+      container.innerHTML = html;
+      const children = Array.from(container.children);
+      let imgIdx = -1;
+      for (let i = 0; i < children.length; i++) {
+        if (children[i].querySelector('img')) { imgIdx = i; break; }
+      }
+
+      let headerHtml = '';
+      let bodyChildren = children;
+      if (imgIdx !== -1) {
+        const consumed = new Set([imgIdx]);
+        const headerEls = [children[imgIdx]];
+        if (children[imgIdx + 1]) {
+          headerEls.push(children[imgIdx + 1]);
+          consumed.add(imgIdx + 1);
+        }
+        headerHtml = headerEls.map(el => el.outerHTML).join('');
+        bodyChildren = children.filter((c, i) => !consumed.has(i));
+      }
+      const bodyHtml = bodyChildren.map(c => c.outerHTML).join('');
+
       const cols = Math.max(1, Math.min(4, config.tooltip.columns || 1));
       const colStyle = cols > 1 ? 'column-count:' + cols + ';' : '';
-      return '<div class="tt-columns" style="' + colStyle + '">' + html + '</div>';
+      return (headerHtml ? '<div class="tt-header">' + headerHtml + '</div>' : '') +
+        '<div class="tt-columns" style="' + colStyle + '">' + bodyHtml + '</div>';
     }
 
     function hideHoverPreview() {
