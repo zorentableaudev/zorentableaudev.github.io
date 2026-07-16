@@ -204,6 +204,13 @@
       <input type="number" id="imageWidth" min="20" max="400" value="60">
     </div>
   </div>
+  <div class="row" id="imageCellPaddingWrap">
+    <div>
+      <label for="imageCellPadding">Space after image (px, table only)</label>
+      <input type="number" id="imageCellPadding" min="0" max="120" value="16">
+    </div>
+    <div></div>
+  </div>
   <p class="hint">Table column widths and column order can also be adjusted by dragging directly in the extension once it's on the dashboard.</p>
 
   <h2>Metrics &amp; dimensions to show</h2>
@@ -213,6 +220,79 @@
   <h2>Display order &amp; header labels</h2>
   <p class="hint">Use "Alias" to rename a header without renaming the underlying field.</p>
   <div class="order-list" id="orderList"></div>
+
+  <h2>Row color</h2>
+  <label class="checkbox-inline"><input type="checkbox" id="rowColorEnabled"> Color each row/card based on a field's value</label>
+  <div id="rowColorOptions">
+    <p class="hint">Example: if Margin &gt; 0, color it green, otherwise red.</p>
+    <div class="row">
+      <div>
+        <label for="rowColorField">Field</label>
+        <select id="rowColorField"><option value="">Choose a field...</option></select>
+      </div>
+      <div>
+        <label for="rowColorOperator">Condition</label>
+        <select id="rowColorOperator">
+          <option value=">">is greater than</option>
+          <option value=">=">is greater than or equal to</option>
+          <option value="<">is less than</option>
+          <option value="<=">is less than or equal to</option>
+          <option value="==">equals</option>
+          <option value="!=">does not equal</option>
+        </select>
+      </div>
+      <div>
+        <label for="rowColorThreshold">Value</label>
+        <input type="number" id="rowColorThreshold" value="0">
+      </div>
+    </div>
+    <div class="row">
+      <div>
+        <label for="rowColorTrue">Color when true</label>
+        <input type="color" id="rowColorTrue" value="#d4edda">
+      </div>
+      <div>
+        <label for="rowColorFalse">Color when false</label>
+        <input type="color" id="rowColorFalse" value="#f8d7da">
+      </div>
+    </div>
+  </div>
+
+  <h2>Appearance</h2>
+  <div class="row">
+    <div>
+      <label for="fontFamily">Font</label>
+      <select id="fontFamily">
+        <option value="">Default</option>
+        <option value="Arial, Helvetica, sans-serif">Arial</option>
+        <option value="Georgia, 'Times New Roman', serif">Georgia (serif)</option>
+        <option value="'Courier New', monospace">Courier New (monospace)</option>
+        <option value="Verdana, Tahoma, sans-serif">Verdana</option>
+      </select>
+    </div>
+    <div>
+      <label for="fontSize">Font size (px)</label>
+      <input type="number" id="fontSize" min="9" max="24" value="12">
+    </div>
+    <div>
+      <label for="textColor">Text color</label>
+      <input type="color" id="textColor" value="#1a1a1a">
+    </div>
+  </div>
+  <div class="row">
+    <div>
+      <label>Header style</label>
+      <label class="checkbox-inline"><input type="checkbox" id="headerBold" checked> Bold</label>
+      <label class="checkbox-inline"><input type="checkbox" id="headerItalic"> Italic</label>
+      <label class="checkbox-inline"><input type="checkbox" id="headerUnderline"> Underline</label>
+    </div>
+    <div>
+      <label>Body style</label>
+      <label class="checkbox-inline"><input type="checkbox" id="bodyBold"> Bold</label>
+      <label class="checkbox-inline"><input type="checkbox" id="bodyItalic"> Italic</label>
+      <label class="checkbox-inline"><input type="checkbox" id="bodyUnderline"> Underline</label>
+    </div>
+  </div>
 
   <h2>Tooltip</h2>
   <label class="checkbox-inline"><input type="checkbox" id="tooltipEnabled" checked> Show hover preview</label>
@@ -267,12 +347,28 @@
     let rowHeight = '';
     let imageHeight = 90;
     let imageWidth = 60;
+    let imageCellPadding = 16;
     let displayFields = [];
     let fieldAliases = {};
     let targetWorksheets = [];
     let editingField = null;
     let tooltipEnabled = true;
     let tooltipTemplate = '';
+    let rowColorEnabled = false;
+    let rowColorField = '';
+    let rowColorOperator = '>';
+    let rowColorThreshold = 0;
+    let rowColorTrue = '#d4edda';
+    let rowColorFalse = '#f8d7da';
+    let fontFamily = '';
+    let fontSize = 12;
+    let textColor = '#1a1a1a';
+    let headerBold = true;
+    let headerItalic = false;
+    let headerUnderline = false;
+    let bodyBold = false;
+    let bodyItalic = false;
+    let bodyUnderline = false;
 
     function showError(msg) { document.getElementById('error').textContent = msg || ''; }
 
@@ -350,11 +446,11 @@
       }
       list.innerHTML = displayFields.map((f, i) => {
         const atTop = i === 0, atBottom = i === displayFields.length - 1;
-        let row = '<div class="order-item">' +
-          '<button type="button" data-action="top" data-index="' + i + '" title="Move to top" ' + (atTop ? 'disabled' : '') + '>&#8607;&#8607;</button>' +
+        let row = '<div class="order-item" data-field="' + escapeHtml(f) + '">' +
+          '<button type="button" data-action="top" data-index="' + i + '" title="Skip to first" ' + (atTop ? 'disabled' : '') + '>&#9198;</button>' +
           '<button type="button" data-action="up" data-index="' + i + '" title="Move up" ' + (atTop ? 'disabled' : '') + '>&uarr;</button>' +
           '<button type="button" data-action="down" data-index="' + i + '" title="Move down" ' + (atBottom ? 'disabled' : '') + '>&darr;</button>' +
-          '<button type="button" data-action="bottom" data-index="' + i + '" title="Move to last" ' + (atBottom ? 'disabled' : '') + '>&#8609;&#8609;</button>' +
+          '<button type="button" data-action="bottom" data-index="' + i + '" title="Skip to last" ' + (atBottom ? 'disabled' : '') + '>&#9197;</button>' +
           '<span class="label">' + escapeHtml(fieldAliases[f] || f) + '</span>' +
           '<button type="button" data-action="edit" data-field="' + escapeHtml(f) + '">Alias</button>' +
           '</div>';
@@ -370,6 +466,16 @@
       document.getElementById('columnsWrap').style.display = layout === 'card' ? '' : 'none';
       document.getElementById('rowHeightWrap').style.display = layout === 'table' ? '' : 'none';
       document.getElementById('imageWidthWrap').style.display = layout === 'table' ? '' : 'none';
+      document.getElementById('imageCellPaddingWrap').style.display = layout === 'table' ? '' : 'none';
+    }
+
+    function updateRowColorOptionsVisibility() {
+      document.getElementById('rowColorOptions').style.display = rowColorEnabled ? '' : 'none';
+    }
+
+    function renderRowColorFieldOptions() {
+      fillSelect(document.getElementById('rowColorField'), fieldNames, rowColorField, true);
+      rowColorField = document.getElementById('rowColorField').value;
     }
 
     function updateSaveEnabled() {
@@ -409,6 +515,7 @@
       renderFieldChecklist();
       renderOrderList();
       renderInsertFieldOptions();
+      renderRowColorFieldOptions();
       if (!preserve) tooltipTemplate = buildDefaultTemplate();
       document.getElementById('ttEditor').innerHTML = tooltipTemplate;
       updateSaveEnabled();
@@ -445,9 +552,27 @@
       rowHeight = (existing && existing.rowHeight) || '';
       imageHeight = (existing && existing.imageHeight) || 90;
       imageWidth = (existing && existing.imageWidth) || 60;
+      imageCellPadding = (existing && existing.imageCellPadding != null) ? existing.imageCellPadding : 16;
       displayFields = Array.isArray(existing && existing.displayFields) ? existing.displayFields : [];
       fieldAliases = (existing && existing.fieldAliases && typeof existing.fieldAliases === 'object') ? existing.fieldAliases : {};
       targetWorksheets = (existing && existing.targetWorksheets) || [];
+      const rc = (existing && existing.rowColor) || {};
+      rowColorEnabled = !!rc.enabled;
+      rowColorField = rc.field || '';
+      rowColorOperator = rc.operator || '>';
+      rowColorThreshold = rc.threshold != null ? rc.threshold : 0;
+      rowColorTrue = rc.trueColor || '#d4edda';
+      rowColorFalse = rc.falseColor || '#f8d7da';
+      const st = (existing && existing.style) || {};
+      fontFamily = st.fontFamily || '';
+      fontSize = st.fontSize || 12;
+      textColor = st.textColor || '#1a1a1a';
+      headerBold = st.headerBold !== false;
+      headerItalic = !!st.headerItalic;
+      headerUnderline = !!st.headerUnderline;
+      bodyBold = !!st.bodyBold;
+      bodyItalic = !!st.bodyItalic;
+      bodyUnderline = !!st.bodyUnderline;
       const t = (existing && existing.tooltip) || {};
       tooltipEnabled = t.enabled !== false;
       if (typeof t.template === 'string' && t.template) {
@@ -473,9 +598,25 @@
       document.getElementById('rowHeight').value = rowHeight;
       document.getElementById('imageHeight').value = imageHeight;
       document.getElementById('imageWidth').value = imageWidth;
+      document.getElementById('imageCellPadding').value = imageCellPadding;
       document.getElementById('tooltipEnabled').checked = tooltipEnabled;
+      document.getElementById('rowColorEnabled').checked = rowColorEnabled;
+      document.getElementById('rowColorOperator').value = rowColorOperator;
+      document.getElementById('rowColorThreshold').value = rowColorThreshold;
+      document.getElementById('rowColorTrue').value = rowColorTrue;
+      document.getElementById('rowColorFalse').value = rowColorFalse;
+      document.getElementById('fontFamily').value = fontFamily;
+      document.getElementById('fontSize').value = fontSize;
+      document.getElementById('textColor').value = textColor;
+      document.getElementById('headerBold').checked = headerBold;
+      document.getElementById('headerItalic').checked = headerItalic;
+      document.getElementById('headerUnderline').checked = headerUnderline;
+      document.getElementById('bodyBold').checked = bodyBold;
+      document.getElementById('bodyItalic').checked = bodyItalic;
+      document.getElementById('bodyUnderline').checked = bodyUnderline;
       updateSizingVisibility();
       updateTooltipOptionsVisibility();
+      updateRowColorOptionsVisibility();
 
       await onWorksheetChange(true);
       if (!tooltipTemplate) {
@@ -515,10 +656,38 @@
         const n = parseInt(e.target.value, 10);
         imageWidth = Number.isFinite(n) ? n : 60;
       });
+      document.getElementById('imageCellPadding').addEventListener('input', e => {
+        const n = parseInt(e.target.value, 10);
+        imageCellPadding = Number.isFinite(n) ? n : 16;
+      });
       document.getElementById('tooltipEnabled').addEventListener('change', e => {
         tooltipEnabled = e.target.checked;
         updateTooltipOptionsVisibility();
       });
+      document.getElementById('rowColorEnabled').addEventListener('change', e => {
+        rowColorEnabled = e.target.checked;
+        updateRowColorOptionsVisibility();
+      });
+      document.getElementById('rowColorField').addEventListener('change', e => { rowColorField = e.target.value; });
+      document.getElementById('rowColorOperator').addEventListener('change', e => { rowColorOperator = e.target.value; });
+      document.getElementById('rowColorThreshold').addEventListener('input', e => {
+        const n = parseFloat(e.target.value);
+        rowColorThreshold = Number.isFinite(n) ? n : 0;
+      });
+      document.getElementById('rowColorTrue').addEventListener('input', e => { rowColorTrue = e.target.value; });
+      document.getElementById('rowColorFalse').addEventListener('input', e => { rowColorFalse = e.target.value; });
+      document.getElementById('fontFamily').addEventListener('change', e => { fontFamily = e.target.value; });
+      document.getElementById('fontSize').addEventListener('input', e => {
+        const n = parseInt(e.target.value, 10);
+        fontSize = Number.isFinite(n) ? n : 12;
+      });
+      document.getElementById('textColor').addEventListener('input', e => { textColor = e.target.value; });
+      document.getElementById('headerBold').addEventListener('change', e => { headerBold = e.target.checked; });
+      document.getElementById('headerItalic').addEventListener('change', e => { headerItalic = e.target.checked; });
+      document.getElementById('headerUnderline').addEventListener('change', e => { headerUnderline = e.target.checked; });
+      document.getElementById('bodyBold').addEventListener('change', e => { bodyBold = e.target.checked; });
+      document.getElementById('bodyItalic').addEventListener('change', e => { bodyItalic = e.target.checked; });
+      document.getElementById('bodyUnderline').addEventListener('change', e => { bodyUnderline = e.target.checked; });
 
       const ttEditor = document.getElementById('ttEditor');
       document.querySelectorAll('.tt-toolbar button[data-cmd]').forEach(btn => {
@@ -597,8 +766,14 @@
         if (!field) return;
         if (e.target.value.trim()) fieldAliases[field] = e.target.value;
         else delete fieldAliases[field];
-        renderOrderList();
-        document.querySelector('[data-alias-for="' + CSS.escape(field) + '"]').focus();
+        // Update just the visible label in place instead of re-rendering the whole list -
+        // replacing the <input> node mid-typing was resetting the cursor to position 0,
+        // which made every new keystroke insert before the previous ones ("typing backwards").
+        const item = document.querySelector('.order-item[data-field="' + CSS.escape(field) + '"]');
+        if (item) {
+          const labelEl = item.querySelector('.label');
+          if (labelEl) labelEl.textContent = fieldAliases[field] || field;
+        }
       });
 
       document.getElementById('targetChecklist').addEventListener('change', e => {
@@ -632,12 +807,32 @@
           rowHeight,
           imageHeight,
           imageWidth,
+          imageCellPadding,
           displayFields,
           fieldAliases,
           targetWorksheets,
           tooltip: {
             enabled: tooltipEnabled,
             template: tooltipTemplate,
+          },
+          rowColor: {
+            enabled: rowColorEnabled,
+            field: rowColorField,
+            operator: rowColorOperator,
+            threshold: rowColorThreshold,
+            trueColor: rowColorTrue,
+            falseColor: rowColorFalse,
+          },
+          style: {
+            fontFamily,
+            fontSize,
+            textColor,
+            headerBold,
+            headerItalic,
+            headerUnderline,
+            bodyBold,
+            bodyItalic,
+            bodyUnderline,
           },
         }));
       });

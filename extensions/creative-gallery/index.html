@@ -88,7 +88,10 @@
     .tile-metric .metric-value { font-weight: 600; white-space: normal; overflow-wrap: break-word; word-break: break-word; text-align: right; }
 
     /* Table layout */
-    table { border-collapse: collapse; width: 100%; table-layout: fixed; }
+    /* border-collapse:separate (not collapse) so position:sticky on thead th works
+       reliably across browsers - sticky + collapsed table borders is a known combo
+       that silently fails to stick in several engines. */
+    table { border-collapse: separate; border-spacing: 0; width: 100%; table-layout: fixed; }
     thead th {
       position: sticky; top: 0; z-index: 1;
       background: #f6f7f9;
@@ -104,7 +107,11 @@
       overflow-wrap: break-word;
       word-break: break-word;
     }
-    thead th.draggable { cursor: grab; position: relative; }
+    /* No position:relative here - sticky already establishes a positioning context for the
+       resize-handle child, and setting relative on top of sticky was silently breaking the
+       sticky effect for every draggable (metric) header - only the non-draggable Image/Title
+       headers were actually staying pinned while scrolling. */
+    thead th.draggable { cursor: grab; }
     thead th.dragging { opacity: .5; }
     .resize-handle {
       position: absolute;
@@ -198,9 +205,15 @@
     let config = {
       worksheet: '', title: '', imageField: '', imageAlias: '', titleField: '', titleAlias: '',
       filterField: '', sortField: '', sortDirection: 'asc', layout: 'card', columns: 4,
-      rowHeight: '', imageHeight: 90, imageWidth: 60, displayFields: [], fieldAliases: {},
+      rowHeight: '', imageHeight: 90, imageWidth: 60, imageCellPadding: 16, displayFields: [], fieldAliases: {},
       targetWorksheets: [],
       tooltip: { enabled: true, template: '' },
+      rowColor: { enabled: false, field: '', operator: '>', threshold: 0, trueColor: '#d4edda', falseColor: '#f8d7da' },
+      style: {
+        fontFamily: '', fontSize: 12, textColor: '#1a1a1a',
+        headerBold: true, headerItalic: false, headerUnderline: false,
+        bodyBold: false, bodyItalic: false, bodyUnderline: false,
+      },
     };
     let columnWidths = {}; // { [field]: px } - table column widths, persisted separately
     let selectedValue = null;
@@ -244,6 +257,36 @@
       return !!(config.worksheet && config.imageField && config.filterField);
     }
 
+    function rowColorFor(item) {
+      const rc = config.rowColor;
+      if (!rc.enabled || !rc.field) return null;
+      const raw = item.colorRaw;
+      const num = typeof raw === 'number' ? raw : parseFloat(raw);
+      if (Number.isNaN(num)) return rc.falseColor;
+      let matched;
+      switch (rc.operator) {
+        case '>': matched = num > rc.threshold; break;
+        case '>=': matched = num >= rc.threshold; break;
+        case '<': matched = num < rc.threshold; break;
+        case '<=': matched = num <= rc.threshold; break;
+        case '==': matched = num === rc.threshold; break;
+        case '!=': matched = num !== rc.threshold; break;
+        default: matched = false;
+      }
+      return matched ? rc.trueColor : rc.falseColor;
+    }
+
+    function fontStyleString(bold, italic, underline) {
+      return 'font-weight:' + (bold ? '700' : '400') + ';font-style:' + (italic ? 'italic' : 'normal') +
+        ';text-decoration:' + (underline ? 'underline' : 'none') + ';';
+    }
+
+    function applyGlobalTextStyle() {
+      content.style.fontFamily = config.style.fontFamily || '';
+      content.style.fontSize = config.style.fontSize ? config.style.fontSize + 'px' : '';
+      content.style.color = config.style.textColor || '';
+    }
+
     function loadConfig() {
       const s = tableau.extensions.settings.getAll();
       let parsed = {};
@@ -263,12 +306,32 @@
         rowHeight: parsed.rowHeight || '',
         imageHeight: parsed.imageHeight || 90,
         imageWidth: parsed.imageWidth || 60,
+        imageCellPadding: parsed.imageCellPadding != null ? parsed.imageCellPadding : 16,
         displayFields: Array.isArray(parsed.displayFields) ? parsed.displayFields : [],
         fieldAliases: (parsed.fieldAliases && typeof parsed.fieldAliases === 'object') ? parsed.fieldAliases : {},
         targetWorksheets: Array.isArray(parsed.targetWorksheets) ? parsed.targetWorksheets : [],
         tooltip: {
           enabled: !parsed.tooltip || parsed.tooltip.enabled !== false,
           template: (parsed.tooltip && typeof parsed.tooltip.template === 'string') ? parsed.tooltip.template : '',
+        },
+        rowColor: {
+          enabled: !!(parsed.rowColor && parsed.rowColor.enabled),
+          field: (parsed.rowColor && parsed.rowColor.field) || '',
+          operator: (parsed.rowColor && parsed.rowColor.operator) || '>',
+          threshold: (parsed.rowColor && parsed.rowColor.threshold != null) ? parsed.rowColor.threshold : 0,
+          trueColor: (parsed.rowColor && parsed.rowColor.trueColor) || '#d4edda',
+          falseColor: (parsed.rowColor && parsed.rowColor.falseColor) || '#f8d7da',
+        },
+        style: {
+          fontFamily: (parsed.style && parsed.style.fontFamily) || '',
+          fontSize: (parsed.style && parsed.style.fontSize) || 12,
+          textColor: (parsed.style && parsed.style.textColor) || '#1a1a1a',
+          headerBold: !parsed.style || parsed.style.headerBold !== false,
+          headerItalic: !!(parsed.style && parsed.style.headerItalic),
+          headerUnderline: !!(parsed.style && parsed.style.headerUnderline),
+          bodyBold: !!(parsed.style && parsed.style.bodyBold),
+          bodyItalic: !!(parsed.style && parsed.style.bodyItalic),
+          bodyUnderline: !!(parsed.style && parsed.style.bodyUnderline),
         },
       };
       if (!config.tooltip.template && parsed.tooltip &&
@@ -356,6 +419,7 @@
       const filterIdx = fieldNames.indexOf(config.filterField);
       const titleIdx = config.titleField ? fieldNames.indexOf(config.titleField) : -1;
       const sortIdx = config.sortField ? fieldNames.indexOf(config.sortField) : -1;
+      const colorIdx = config.rowColor.enabled && config.rowColor.field ? fieldNames.indexOf(config.rowColor.field) : -1;
       const templateFields = [];
       {
         const re = /data-tt-field="([^"]+)"/g;
@@ -399,6 +463,7 @@
           imageUrl: r[imgIdx].formattedValue,
           metricsMap: metricsMap,
           sortRaw: sortIdx !== -1 ? r[sortIdx].value : null,
+          colorRaw: colorIdx !== -1 ? r[colorIdx].value : null,
         });
       });
 
@@ -415,21 +480,26 @@
       lastItems = items;
       lastItemsByValue = new Map(items.map(it => [String(it.value), it]));
 
+      applyGlobalTextStyle();
       if (config.layout === 'table') renderTable(items);
       else renderCards(items);
     }
 
     function renderCards(items) {
+      const titleStyle = fontStyleString(config.style.headerBold, config.style.headerItalic, config.style.headerUnderline);
+      const bodyStyle = fontStyleString(config.style.bodyBold, config.style.bodyItalic, config.style.bodyUnderline);
       let html = '<div class="gallery" style="--cols:' + config.columns + '">';
       items.forEach(t => {
         const active = String(t.value) === String(selectedValue) ? ' active' : '';
-        html += '<div class="tile' + active + '" data-value="' + escapeHtml(t.value) + '">' +
+        const bg = rowColorFor(t);
+        const tileStyle = bg ? ' style="background:' + bg + '"' : '';
+        html += '<div class="tile' + active + '" data-value="' + escapeHtml(t.value) + '"' + tileStyle + '>' +
           '<img src="' + escapeHtml(t.imageUrl) + '" alt="' + escapeHtml(t.title) +
           '" loading="lazy" style="height:' + config.imageHeight + 'px" onerror="this.classList.add(\'broken\')">' +
           '<div class="tile-body">';
-        if (config.titleField) html += '<div class="tile-title">' + escapeHtml(t.title) + '</div>';
+        if (config.titleField) html += '<div class="tile-title" style="' + titleStyle + '">' + escapeHtml(t.title) + '</div>';
         config.displayFields.forEach(f => {
-          html += '<div class="tile-metric"><span class="metric-label">' + escapeHtml(aliasFor(f)) +
+          html += '<div class="tile-metric" style="' + bodyStyle + '"><span class="metric-label">' + escapeHtml(aliasFor(f)) +
             '</span><span class="metric-value">' + escapeHtml(t.metricsMap[f]) + '</span></div>';
         });
         html += '</div></div>';
@@ -440,6 +510,9 @@
     }
 
     function renderTable(items) {
+      const headerStyle = fontStyleString(config.style.headerBold, config.style.headerItalic, config.style.headerUnderline);
+      const bodyStyle = fontStyleString(config.style.bodyBold, config.style.bodyItalic, config.style.bodyUnderline);
+
       let html = '<table><colgroup><col style="width:' + config.imageWidth + 'px">';
       if (config.titleField) {
         html += '<col id="' + fieldColId(TITLE_COL_KEY) + '" style="width:' + colWidth(TITLE_COL_KEY, 180) + 'px">';
@@ -448,25 +521,29 @@
         html += '<col id="' + fieldColId(f) + '" style="width:' + colWidth(f) + 'px">';
       });
       html += '</colgroup><thead><tr>';
-      html += '<th>' + escapeHtml(config.imageAlias || 'Image') + '</th>';
+      html += '<th style="' + headerStyle + '">' + escapeHtml(config.imageAlias || 'Image') + '</th>';
       if (config.titleField) {
-        html += '<th data-field="' + TITLE_COL_KEY + '">' + escapeHtml(aliasFor(config.titleField)) +
+        html += '<th data-field="' + TITLE_COL_KEY + '" style="' + headerStyle + '">' + escapeHtml(aliasFor(config.titleField)) +
           '<div class="resize-handle" data-field="' + TITLE_COL_KEY + '"></div></th>';
       }
       config.displayFields.forEach(f => {
-        html += '<th class="draggable" data-field="' + escapeHtml(f) + '">' + escapeHtml(aliasFor(f)) +
+        html += '<th class="draggable" data-field="' + escapeHtml(f) + '" style="' + headerStyle + '">' + escapeHtml(aliasFor(f)) +
           '<div class="resize-handle" data-field="' + escapeHtml(f) + '"></div></th>';
       });
       html += '</tr></thead><tbody>';
 
       items.forEach(t => {
         const active = String(t.value) === String(selectedValue) ? ' active' : '';
-        const rowStyle = config.rowHeight ? ' style="min-height:' + config.rowHeight + 'px"' : '';
+        const bg = rowColorFor(t);
+        const rowStyleParts = [];
+        if (config.rowHeight) rowStyleParts.push('min-height:' + config.rowHeight + 'px');
+        if (bg) rowStyleParts.push('background:' + bg);
+        const rowStyle = rowStyleParts.length ? ' style="' + rowStyleParts.join(';') + '"' : '';
         html += '<tr class="row-item' + active + '" data-value="' + escapeHtml(t.value) + '"' + rowStyle + '>' +
-          '<td class="thumb-cell"><img src="' + escapeHtml(t.imageUrl) + '" alt="' + escapeHtml(t.title) +
+          '<td class="thumb-cell" style="padding-right:' + config.imageCellPadding + 'px"><img src="' + escapeHtml(t.imageUrl) + '" alt="' + escapeHtml(t.title) +
           '" loading="lazy" style="width:' + config.imageWidth + 'px;height:' + config.imageHeight + 'px" onerror="this.classList.add(\'broken\')"></td>';
-        if (config.titleField) html += '<td>' + escapeHtml(t.title) + '</td>';
-        config.displayFields.forEach(f => { html += '<td>' + escapeHtml(t.metricsMap[f]) + '</td>'; });
+        if (config.titleField) html += '<td style="' + bodyStyle + '">' + escapeHtml(t.title) + '</td>';
+        config.displayFields.forEach(f => { html += '<td style="' + bodyStyle + '">' + escapeHtml(t.metricsMap[f]) + '</td>'; });
         html += '</tr>';
       });
       html += '</tbody></table>';
