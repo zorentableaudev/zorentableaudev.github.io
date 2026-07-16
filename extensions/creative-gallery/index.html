@@ -181,8 +181,10 @@
       padding-bottom: 8px;
       border-bottom: 1px solid #eef0f3;
     }
-    #hoverPreview .tt-columns { column-gap: 12px; }
-    #hoverPreview .tt-columns > div { break-inside: avoid; -webkit-column-break-inside: avoid; }
+    /* Explicit per-field column routing (not CSS multi-column auto-flow) - each field is
+       assigned to a column bucket in Configure, so placement is deterministic. */
+    #hoverPreview .tt-cols { display: flex; gap: 12px; }
+    #hoverPreview .tt-col { flex: 1; min-width: 0; }
     #hoverPreview img {
       display: block;
       margin: 0 auto 6px;
@@ -218,7 +220,7 @@
       filterField: '', sortField: '', sortDirection: 'asc', layout: 'card', columns: 4,
       rowHeight: '', imageHeight: 90, imageWidth: 60, imageCellPadding: 16, displayFields: [], fieldAliases: {},
       targetWorksheets: [],
-      tooltip: { enabled: true, template: '', columns: 1, width: 280, maxHeight: 360 },
+      tooltip: { enabled: true, template: '', columns: 1, width: 280, maxHeight: 360, fieldColumns: {} },
       rowColor: { enabled: false, field: '', operator: '>', threshold: 0, trueColor: '#d4edda', falseColor: '#f8d7da' },
       style: {
         fontFamily: '', fontSize: 12, textColor: '#1a1a1a',
@@ -327,6 +329,7 @@
           columns: (parsed.tooltip && parsed.tooltip.columns) || 1,
           width: (parsed.tooltip && parsed.tooltip.width) || 280,
           maxHeight: (parsed.tooltip && parsed.tooltip.maxHeight) || 360,
+          fieldColumns: (parsed.tooltip && parsed.tooltip.fieldColumns && typeof parsed.tooltip.fieldColumns === 'object') ? parsed.tooltip.fieldColumns : {},
         },
         rowColor: {
           enabled: !!(parsed.rowColor && parsed.rowColor.enabled),
@@ -684,46 +687,61 @@
       e.preventDefault();
     }
 
-    function renderTooltipHtml(item) {
-      let html = config.tooltip.template || '';
-      html = html.replace(/<span[^>]*data-tt-image="[^"]*"[^>]*>.*?<\/span>/g, () => {
+    function substituteTooltipChips(html, item) {
+      let out = html.replace(/<span[^>]*data-tt-image="[^"]*"[^>]*>.*?<\/span>/g, () => {
         if (!item.imageUrl) return '';
         return '<img src="' + escapeHtml(item.imageUrl) +
           '" style="max-width:260px;max-height:200px;object-fit:contain;display:block;border-radius:4px;background:#eef0f3;" onerror="this.style.display=\'none\'">';
       });
-      html = html.replace(/<span[^>]*data-tt-field="([^"]+)"[^>]*>.*?<\/span>/g, (m, field) => {
+      out = out.replace(/<span[^>]*data-tt-field="([^"]+)"[^>]*>.*?<\/span>/g, (m, field) => {
         return escapeHtml(item.metricsMap[field] == null ? '' : item.metricsMap[field]);
       });
+      return out;
+    }
 
-      // Pull the image - and whatever line immediately follows it in the template (typically
-      // its name/title) - out of the column flow so it always renders as a centered header
-      // above everything else, never running in parallel with a later column's text.
+    function renderTooltipHtml(item) {
+      // Parse the raw (pre-substitution) template so chip attributes are still readable -
+      // that's how we know which field each block belongs to, for both header-hoisting and
+      // per-field column routing, without caring where that block ends up textually.
       const container = document.createElement('div');
-      container.innerHTML = html;
+      container.innerHTML = config.tooltip.template || '';
       const children = Array.from(container.children);
+
       let imgIdx = -1;
       for (let i = 0; i < children.length; i++) {
-        if (children[i].querySelector('img')) { imgIdx = i; break; }
+        if (children[i].querySelector('[data-tt-image]')) { imgIdx = i; break; }
       }
 
-      let headerHtml = '';
-      let bodyChildren = children;
+      const consumed = new Set();
+      let headerEls = [];
       if (imgIdx !== -1) {
-        const consumed = new Set([imgIdx]);
-        const headerEls = [children[imgIdx]];
+        headerEls = [children[imgIdx]];
+        consumed.add(imgIdx);
         if (children[imgIdx + 1]) {
           headerEls.push(children[imgIdx + 1]);
           consumed.add(imgIdx + 1);
         }
-        headerHtml = headerEls.map(el => el.outerHTML).join('');
-        bodyChildren = children.filter((c, i) => !consumed.has(i));
       }
-      const bodyHtml = bodyChildren.map(c => c.outerHTML).join('');
+      const headerHtml = headerEls.map(el => substituteTooltipChips(el.outerHTML, item)).join('');
 
+      // Route each remaining block to the column assigned (in Configure) to the first field
+      // chip it contains - deterministic placement instead of automatic CSS column reflow.
       const cols = Math.max(1, Math.min(4, config.tooltip.columns || 1));
-      const colStyle = cols > 1 ? 'column-count:' + cols + ';' : '';
-      return (headerHtml ? '<div class="tt-header">' + headerHtml + '</div>' : '') +
-        '<div class="tt-columns" style="' + colStyle + '">' + bodyHtml + '</div>';
+      const buckets = Array.from({ length: cols }, () => []);
+      children.forEach((el, i) => {
+        if (consumed.has(i)) return;
+        const fieldSpan = el.querySelector('[data-tt-field]');
+        const field = fieldSpan ? fieldSpan.getAttribute('data-tt-field') : null;
+        const assigned = field && config.tooltip.fieldColumns ? config.tooltip.fieldColumns[field] : null;
+        const col = Math.max(1, Math.min(cols, assigned || 1));
+        buckets[col - 1].push(substituteTooltipChips(el.outerHTML, item));
+      });
+
+      const bodyHtml = '<div class="tt-cols">' +
+        buckets.map(b => '<div class="tt-col">' + b.join('') + '</div>').join('') +
+        '</div>';
+
+      return (headerHtml ? '<div class="tt-header">' + headerHtml + '</div>' : '') + bodyHtml;
     }
 
     function hideHoverPreview() {

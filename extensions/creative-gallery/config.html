@@ -107,6 +107,13 @@
     }
     .tt-editor .tt-field-image { background: #eafbf0; color: #1a8a4a; }
 
+    .col-assign-row {
+      display: flex; align-items: center; gap: 8px;
+      font-size: 12px; margin: 4px 0;
+    }
+    .col-assign-row .name { flex: 1; }
+    .col-assign-row select { width: auto; padding: 3px 6px; font-size: 11px; }
+
     .actions {
       margin-top: 20px;
       display: flex;
@@ -319,6 +326,12 @@
         <input type="number" id="ttMaxHeight" min="100" max="800" value="360">
       </div>
     </div>
+    <div id="tooltipColumnAssignWrap">
+      <label>Which column each field appears in</label>
+      <p class="hint">Only matters when Columns above is more than 1. Fields not listed here
+        (or without a column set) default to column 1.</p>
+      <div class="box" id="tooltipColumnAssign"></div>
+    </div>
     <div class="tt-toolbar">
       <button type="button" data-cmd="bold" title="Bold"><b>B</b></button>
       <button type="button" data-cmd="italic" title="Italic"><i>I</i></button>
@@ -377,6 +390,7 @@
     let tooltipColumns = 1;
     let tooltipWidth = 280;
     let tooltipMaxHeight = 360;
+    let tooltipFieldColumns = {};
     let rowColorEnabled = false;
     let rowColorField = '';
     let rowColorOperator = '>';
@@ -430,6 +444,27 @@
 
     function updateTooltipOptionsVisibility() {
       document.getElementById('tooltipOptions').style.display = tooltipEnabled ? '' : 'none';
+    }
+
+    function updateTooltipColumnAssignVisibility() {
+      document.getElementById('tooltipColumnAssignWrap').style.display = tooltipColumns > 1 ? '' : 'none';
+    }
+
+    function renderTooltipColumnAssign() {
+      const box = document.getElementById('tooltipColumnAssign');
+      if (!displayFields.length) {
+        box.innerHTML = '<span class="hint">No metrics/dimensions selected yet.</span>';
+        return;
+      }
+      box.innerHTML = displayFields.map(f => {
+        const current = Math.max(1, Math.min(tooltipColumns, tooltipFieldColumns[f] || 1));
+        const opts = [];
+        for (let c = 1; c <= tooltipColumns; c++) {
+          opts.push('<option value="' + c + '"' + (c === current ? ' selected' : '') + '>' + c + '</option>');
+        }
+        return '<div class="col-assign-row"><span class="name">' + escapeHtml(fieldAliases[f] || f) +
+          '</span><select data-tt-col-field="' + escapeHtml(f) + '">' + opts.join('') + '</select></div>';
+      }).join('');
     }
 
     function fieldChip(field) {
@@ -545,14 +580,18 @@
       filterField = document.getElementById('filterField').value;
       sortField = document.getElementById('sortField').value;
 
-      if (!preserve) { targetWorksheets = []; displayFields = []; fieldAliases = {}; }
-      else { displayFields = displayFields.filter(f => fieldNames.includes(f) && f !== imageField); }
+      if (!preserve) { targetWorksheets = []; displayFields = []; fieldAliases = {}; tooltipFieldColumns = {}; }
+      else {
+        displayFields = displayFields.filter(f => fieldNames.includes(f) && f !== imageField);
+        Object.keys(tooltipFieldColumns).forEach(f => { if (!displayFields.includes(f)) delete tooltipFieldColumns[f]; });
+      }
 
       renderTargetChecklist();
       renderFieldChecklist();
       renderOrderList();
       renderInsertFieldOptions();
       renderRowColorFieldOptions();
+      renderTooltipColumnAssign();
       if (!preserve) tooltipTemplate = buildDefaultTemplate();
       document.getElementById('ttEditor').innerHTML = tooltipTemplate;
       updateSaveEnabled();
@@ -615,6 +654,7 @@
       tooltipColumns = t.columns || 1;
       tooltipWidth = t.width || 280;
       tooltipMaxHeight = t.maxHeight || 360;
+      tooltipFieldColumns = (t.fieldColumns && typeof t.fieldColumns === 'object') ? { ...t.fieldColumns } : {};
       if (typeof t.template === 'string' && t.template) {
         tooltipTemplate = t.template;
       } else if (t.showImage !== undefined || t.showTitle !== undefined || Array.isArray(t.fields)) {
@@ -659,6 +699,7 @@
       document.getElementById('bodyUnderline').checked = bodyUnderline;
       updateSizingVisibility();
       updateTooltipOptionsVisibility();
+      updateTooltipColumnAssignVisibility();
       updateRowColorOptionsVisibility();
 
       await onWorksheetChange(true);
@@ -676,6 +717,7 @@
         displayFields = displayFields.filter(f => f !== imageField);
         renderFieldChecklist();
         renderOrderList();
+        renderTooltipColumnAssign();
         updateSaveEnabled();
       });
       document.getElementById('titleField').addEventListener('change', e => { titleField = e.target.value; });
@@ -745,7 +787,16 @@
         applyExactFontSize(e.target.value);
         syncTooltipTemplateFromEditor();
       });
-      document.getElementById('ttColumns').addEventListener('change', e => { tooltipColumns = parseInt(e.target.value, 10) || 1; });
+      document.getElementById('ttColumns').addEventListener('change', e => {
+        tooltipColumns = parseInt(e.target.value, 10) || 1;
+        updateTooltipColumnAssignVisibility();
+        renderTooltipColumnAssign();
+      });
+      document.getElementById('tooltipColumnAssign').addEventListener('change', e => {
+        const field = e.target.getAttribute('data-tt-col-field');
+        if (field == null) return;
+        tooltipFieldColumns[field] = parseInt(e.target.value, 10) || 1;
+      });
       document.getElementById('ttWidth').addEventListener('input', e => {
         const n = parseInt(e.target.value, 10);
         tooltipWidth = Number.isFinite(n) ? n : 280;
@@ -787,8 +838,10 @@
         } else {
           displayFields = displayFields.filter(f => f !== field);
           if (editingField === field) editingField = null;
+          delete tooltipFieldColumns[field];
         }
         renderOrderList();
+        renderTooltipColumnAssign();
       });
 
       document.getElementById('orderList').addEventListener('click', e => {
@@ -814,8 +867,10 @@
           const field = e.target.getAttribute('data-field');
           displayFields = displayFields.filter(f => f !== field);
           if (editingField === field) editingField = null;
+          delete tooltipFieldColumns[field];
           renderFieldChecklist();
           renderOrderList();
+          renderTooltipColumnAssign();
         }
       });
 
@@ -832,6 +887,7 @@
           const labelEl = item.querySelector('.label');
           if (labelEl) labelEl.textContent = fieldAliases[field] || field;
         }
+        renderTooltipColumnAssign();
       });
 
       document.getElementById('targetChecklist').addEventListener('change', e => {
@@ -875,6 +931,7 @@
             columns: tooltipColumns,
             width: tooltipWidth,
             maxHeight: tooltipMaxHeight,
+            fieldColumns: tooltipFieldColumns,
           },
           rowColor: {
             enabled: rowColorEnabled,
