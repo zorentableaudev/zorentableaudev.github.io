@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest manifest-version="0.1" xmlns="http://www.tableau.com/xml/extension_manifest">
+  <worksheet-extension id="com.example.kpi-tile" extension-version="1.0.0">
+    <default-locale>en_US</default-locale>
+    <name>KPI Tile</name>
+    <description>BAN + sparkline KPI cards with comparison-period overlay and configurable styling — the viz extension counterpart of the KPI Cards dashboard extension. Drop multiple measures on "KPI Values" to get one card per metric.</description>
+    <author name="Author" email="author@example.com" organization="Example" website="https://example.com"/>
+    <min-api-version>1.12</min-api-version>
+    <source-location>
+      <url>https://zorentableaudev.github.io/extensions/kpi-tile/index.html</url>
+    </source-location>
+    <icon>iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==</icon>
+
+    <context-menu>
+      <configure-context-menu-item />
+    </context-menu>
+
+    <encoding id="current">
+      <display-name>KPI Values</display-name>
+      <data-spec>
+        <data-type>numeric</data-type>
+      </data-spec>
+      <role-spec>
+        <role-type>continuous-measure</role-type>
+      </role-spec>
+      <fields max-count="20"/>
+      <encoding-icon token="metric" />
+      <tooltip>Drop one or more measures here — each one becomes its own KPI card. The most recent row (by Date, if set) is the card's big number; every row is its trend.</tooltip>
+    </encoding>
+
+    <encoding id="comparison">
+      <display-name>Comparison Values</display-name>
+      <data-spec>
+        <data-type>numeric</data-type>
+      </data-spec>
+      <role-spec>
+        <role-type>continuous-measure</role-type>
+      </role-spec>
+      <fields max-count="20"/>
+      <encoding-icon token="delta-up" />
+      <tooltip>Optional — prior period, prior year, budget, target, or any other measure (e.g. an "LY" column next to a "CY" one on KPI Values). Which field pairs with which KPI Values field is set explicitly in Configure's Metrics tab, not just drop order. Drives the % delta and the comparison sparkline series.</tooltip>
+    </encoding>
+
+    <encoding id="date">
+      <display-name>Date (trend axis)</display-name>
+      <data-spec>
+        <data-type>temporal</data-type>
+      </data-spec>
+      <fields max-count="5"/>
+      <tooltip>Optional — drop one or more date fields to turn every card into a trend with a sparkline. If you drop more than one, pick which to actually use in Configure's Sparkline tab. Leave empty for single-value cards with no sparkline.</tooltip>
+    </encoding>
+
+    <encoding id="supportingMetric">
+      <display-name>Supporting Metric</display-name>
+      <fields max-count="20"/>
+      <encoding-icon token="three-dots" />
+      <tooltip>Optional — one extra context line per card. Which field pairs with which KPI Values field is set explicitly in Configure's Metrics tab.</tooltip>
+    </encoding>
+  </worksheet-extension>
+</manifest>

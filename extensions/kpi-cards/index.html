@@ -1,0 +1,837 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>KPI Cards</title>
+<script src="./tableau.extensions.1.latest.min.js"></script>
+<script src="./palettes.js"></script>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    font-size: 13px;
+    color: #1a1a1a;
+    background: #fff;
+    overflow: auto;
+  }
+  #app { display: flex; flex-direction: column; min-height: 100vh; }
+
+  .header {
+    background: #1e6eb5;
+    color: #fff;
+    padding: 8px 12px;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+  }
+  .header h1 { font-size: 13px; font-weight: 700; letter-spacing: .2px; }
+  .header button {
+    margin-left: auto;
+    background: rgba(255,255,255,.15);
+    color: #fff;
+    border: 1px solid rgba(255,255,255,.4);
+    border-radius: 4px;
+    padding: 4px 9px;
+    font-size: 11px;
+    cursor: pointer;
+  }
+  .header button:hover { background: rgba(255,255,255,.28); }
+
+  .content { flex: 1; padding: 14px; overflow: auto; }
+
+  .grid { display: grid; gap: 12px; }
+
+  .kpi-card {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    padding: 14px 14px 12px;
+    overflow: hidden;
+    cursor: pointer;
+    transition: box-shadow .12s ease, transform .12s ease;
+  }
+  .kpi-card.clickable:hover { transform: translateY(-1px); }
+  .kpi-card.active { outline: 2px solid #1e6eb5; outline-offset: -2px; }
+  .kpi-card .accent-top { position: absolute; top: 0; left: 0; right: 0; height: 4px; }
+  .kpi-card .accent-left { position: absolute; top: 0; left: 0; bottom: 0; width: 4px; }
+  .kpi-card .k-label { text-transform: uppercase; letter-spacing: .3px; opacity: .7; margin-bottom: 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .kpi-card .k-value { font-weight: 700; line-height: 1.1; margin-bottom: 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .kpi-card .k-delta { font-size: 11px; font-weight: 600; display: inline-flex; align-items: center; gap: 3px; }
+  .kpi-card .k-support { font-size: 10.5px; opacity: .75; margin-top: 3px; }
+  .kpi-card .k-caption { font-size: 11px; margin-top: 8px; }
+  .kpi-card .k-spark { display: block; width: 100%; height: 100%; }
+  .k-spark circle.hit { pointer-events: all; }
+  .k-body { display: flex; flex: 1 1 auto; min-height: 0; }
+  .k-body.below { flex-direction: column; }
+  .k-body.right { flex-direction: row; align-items: stretch; gap: 14px; }
+  .k-body .k-main { flex: 0 0 auto; min-width: 0; }
+  .k-spark-wrap.below { flex: 1 1 auto; min-height: 28px; margin-top: 6px; display: flex; align-items: stretch; }
+  .k-spark-wrap.right { flex: 1 1 auto; min-width: 60px; display: flex; align-items: stretch; }
+  .k-spark-inner { display: flex; flex-direction: column; flex: 1 1 auto; min-width: 0; min-height: 0; }
+  .k-spark-row { display: flex; align-items: stretch; gap: 3px; flex: 1 1 auto; min-width: 0; min-height: 0; }
+  .k-spark-row .k-spark { flex: 1 1 auto; min-width: 0; min-height: 0; width: auto; }
+  /* A real column to the left of the chart (not overlaid on top of it) - min/max stacked via
+     space-between so they land roughly level with the chart's own top/bottom. */
+  .k-axis-y { flex: 0 0 auto; display: flex; flex-direction: column; justify-content: space-between; align-items: flex-end; text-align: right; font-size: 9px; line-height: 1; opacity: .55; }
+  .k-axis-x { display: flex; justify-content: space-between; font-size: 9px; line-height: 1; opacity: .55; margin-top: 2px; flex: 0 0 auto; }
+
+  .empty-state, .error-state {
+    padding: 24px 16px;
+    text-align: center;
+    color: #666;
+  }
+  .error-state { color: #b3261e; }
+  .empty-state button, .error-state button {
+    margin-top: 10px;
+    padding: 7px 14px;
+    background: #1e6eb5;
+    color: #fff;
+    border: none;
+    border-radius: 4px;
+    font-size: 12px;
+    cursor: pointer;
+  }
+
+  #hoverTip {
+    position: fixed;
+    z-index: 1000;
+    pointer-events: none;
+    background: #fff;
+    border: 1px solid #ccd1d9;
+    border-radius: 6px;
+    box-shadow: 0 4px 16px rgba(0,0,0,.18);
+    padding: 8px 10px;
+    display: none;
+    font-size: 12px;
+    line-height: 1.5;
+    max-width: 280px;
+  }
+  #hoverTip .tt-field { color: inherit; }
+</style>
+</head>
+<body>
+<div id="app">
+  <div class="header">
+    <h1 id="extTitle">KPI Cards</h1>
+    <button id="configureBtn">Configure</button>
+  </div>
+  <div class="content" id="content"></div>
+</div>
+<div id="hoverTip"></div>
+
+<script>
+  let dashboard;
+  let cfg = null;
+  let activeCardId = null;
+  let worksheetTables = {}; // worksheet name -> { rows: [{fieldsMap, valuesMap}] }
+  const content = document.getElementById('content');
+  const hoverTip = document.getElementById('hoverTip');
+
+  function escapeHtml(str) {
+    const d = document.createElement('div');
+    d.textContent = str == null ? '' : String(str);
+    return d.innerHTML;
+  }
+
+  function isConfigured() {
+    return !!(cfg && Array.isArray(cfg.kpis) && cfg.kpis.length &&
+      cfg.kpis.every(k => k.worksheet && k.currentField && (k.labelMode === 'custom' ? k.customLabel : k.labelField)));
+  }
+
+  function loadConfig() {
+    const s = tableau.extensions.settings.getAll();
+    try { cfg = s.config ? JSON.parse(s.config) : null; } catch (_) { cfg = null; }
+    const titleEl = document.getElementById('extTitle');
+    const btnEl = document.getElementById('configureBtn');
+    const headerEl = document.querySelector('.header');
+    const showTitle = !(cfg && cfg.showTitle === false);
+    const showBtn = !(cfg && cfg.showConfigureButton === false);
+    titleEl.textContent = (cfg && cfg.title) || 'KPI Cards';
+    titleEl.style.display = showTitle ? '' : 'none';
+    btnEl.style.display = showBtn ? '' : 'none';
+    // Independent of each other - hide the header bar entirely rather than leaving an
+    // empty colored strip when both are off. The right-click "Configure..." context menu
+    // item always works regardless, so there's still a way back in either way.
+    headerEl.style.display = (showTitle || showBtn) ? '' : 'none';
+  }
+
+  function renderUnconfigured(message) {
+    content.innerHTML = '<div class="empty-state">' +
+      escapeHtml(message || 'This extension has not been configured yet.') +
+      '<br><button id="configureNow">Configure</button></div>';
+    document.getElementById('configureNow').addEventListener('click', openConfigure);
+  }
+
+  function renderError(message) {
+    content.innerHTML = '<div class="error-state">' + escapeHtml(message) + '</div>';
+  }
+
+  // ---------- Palette / colors ----------
+  function currentPalette() {
+    return (window.TABLEAU_PALETTES || []).find(p => p.name === cfg.paletteName) || { colors: ['#1e6eb5'] };
+  }
+  function cardColors(kpi) {
+    if (cfg.colorMode === 'individual' && kpi.useCustomColors) return { pos: kpi.positiveColor, neg: kpi.negativeColor };
+    return { pos: cfg.positiveColor, neg: cfg.negativeColor };
+  }
+
+  // ---------- Tooltip templating (mirrors config.html's rich-text chip system) ----------
+  function substituteTooltipChips(html, fieldsMap) {
+    return html.replace(/<span[^>]*data-tt-field="([^"]+)"[^>]*>.*?<\/span>/g, (m, field) => {
+      return escapeHtml(fieldsMap[field] == null ? '' : fieldsMap[field]);
+    });
+  }
+
+  function hideTip() { hoverTip.style.display = 'none'; }
+
+  function showTip(html, x, y) {
+    if (!html) { hideTip(); return; }
+    hoverTip.innerHTML = html;
+    hoverTip.style.display = 'block';
+    const pad = 14;
+    let left = x + pad, top = y + pad;
+    const rect = hoverTip.getBoundingClientRect();
+    if (left + rect.width > window.innerWidth) left = Math.max(4, x - rect.width - pad);
+    if (top + rect.height > window.innerHeight) top = Math.max(4, y - rect.height - pad);
+    hoverTip.style.left = left + 'px';
+    hoverTip.style.top = top + 'px';
+  }
+
+  // ---------- Sparkline chart builder (bar/line/area, current + comparison overlay) ----------
+  function sparkDashArray(style) {
+    if (style === 'dotted') return '1.5,3.5';
+    if (style === 'broken') return '6,3';
+    return null;
+  }
+
+  function sparkLinePath(points, style) {
+    if (!points.length) return '';
+    if (style === 'stepped') {
+      let d = 'M' + points[0].x.toFixed(1) + ',' + points[0].y.toFixed(1);
+      for (let i = 1; i < points.length; i++) {
+        d += ' L' + points[i].x.toFixed(1) + ',' + points[i - 1].y.toFixed(1);
+        d += ' L' + points[i].x.toFixed(1) + ',' + points[i].y.toFixed(1);
+      }
+      return d;
+    }
+    return 'M' + points.map(p => p.x.toFixed(1) + ',' + p.y.toFixed(1)).join(' L');
+  }
+
+  function sparkAreaPath(points, h) {
+    if (!points.length) return '';
+    let d = 'M' + points[0].x.toFixed(1) + ',' + h;
+    points.forEach(p => { d += ' L' + p.x.toFixed(1) + ',' + p.y.toFixed(1); });
+    d += ' L' + points[points.length - 1].x.toFixed(1) + ',' + h + ' Z';
+    return d;
+  }
+
+  function sparkScalePoints(trend, minV, maxV, w, h) {
+    const range = (maxV - minV) || 1;
+    return trend.map((t, i) => ({
+      x: trend.length > 1 ? (i / (trend.length - 1)) * w : w / 2,
+      y: h - ((t.value - minV) / range) * h,
+    }));
+  }
+
+  function sparkBarRects(points, style, color, offset, barWidth, h) {
+    return points.map(p => {
+      const barH = Math.max(0, h - p.y);
+      const x = p.x + offset - barWidth / 2;
+      const fill = style === 'outline' ? 'none' : color;
+      const stroke = style === 'outline' ? color : 'none';
+      return '<rect x="' + x.toFixed(1) + '" y="' + p.y.toFixed(1) + '" width="' + barWidth.toFixed(1) +
+        '" height="' + barH.toFixed(1) + '" fill="' + fill + '" stroke="' + stroke + '" stroke-width="' + (style === 'outline' ? 1.3 : 0) + '"/>';
+    }).join('');
+  }
+
+  function sparkSeriesSVG(points, chartType, lineStyle, barStyle, areaStyle, color, h, barOffset, barWidth, gradId) {
+    if (chartType === 'bar') {
+      return { html: sparkBarRects(points, barStyle, color, barOffset || 0, barWidth, h), defs: '' };
+    }
+    if (chartType === 'area') {
+      const path = sparkAreaPath(points, h);
+      let defs = '', fill, fillOpacity = '0.25', strokeWidth = 2;
+      if (areaStyle === 'faded') {
+        defs = '<linearGradient id="' + gradId + '" x1="0" y1="0" x2="0" y2="1">' +
+          '<stop offset="0%" stop-color="' + color + '" stop-opacity="0.4"/>' +
+          '<stop offset="100%" stop-color="' + color + '" stop-opacity="0"/>' +
+          '</linearGradient>';
+        fill = 'url(#' + gradId + ')';
+        fillOpacity = '1';
+        strokeWidth = 2.5;
+      } else {
+        fill = color;
+      }
+      const html = '<path d="' + path + '" fill="' + fill + '" fill-opacity="' + fillOpacity + '" stroke="none"/>' +
+        '<path d="' + sparkLinePath(points, 'solid') + '" fill="none" stroke="' + color + '" stroke-width="' + strokeWidth + '" stroke-linejoin="round" stroke-linecap="round"/>';
+      return { html, defs };
+    }
+    const dash = sparkDashArray(lineStyle);
+    const html = '<path d="' + sparkLinePath(points, lineStyle) + '" fill="none" stroke="' + color + '" stroke-width="2" ' +
+      (dash ? 'stroke-dasharray="' + dash + '" ' : '') + 'stroke-linejoin="round" stroke-linecap="round"/>';
+    return { html, defs: '' };
+  }
+
+  function buildSparklineSVG(kpi, currentTrend, comparisonTrend, accentColor, withHitCircles) {
+    const w = 100, h = 28;
+    const curOn = kpi.sparklineEnabled && currentTrend && currentTrend.length > 1;
+    const cmpOn = kpi.comparisonSparkEnabled && comparisonTrend && comparisonTrend.length > 1;
+    if (!curOn && !cmpOn) return '';
+
+    const allVals = [].concat(curOn ? currentTrend.map(t => t.value) : []).concat(cmpOn ? comparisonTrend.map(t => t.value) : []);
+    const minV = Math.min(...allVals), maxV = Math.max(...allVals);
+
+    const curPts = curOn ? sparkScalePoints(currentTrend, minV, maxV, w, h) : [];
+    const cmpPts = cmpOn ? sparkScalePoints(comparisonTrend, minV, maxV, w, h) : [];
+    const cmpColor = kpi.cmpSparkColor || '#b7bec6';
+    const uid = 'g' + Math.random().toString(36).slice(2, 8);
+
+    let body = '', defs = '';
+    const bothBars = curOn && cmpOn && kpi.curSparkChartType === 'bar' && kpi.cmpSparkChartType === 'bar';
+
+    if (bothBars) {
+      const slot = w / Math.max(curPts.length, cmpPts.length, 1);
+      const bw = slot * 0.32;
+      const cmpRes = sparkSeriesSVG(cmpPts, 'bar', null, kpi.cmpSparkBarStyle, null, cmpColor, h, -bw * 0.55, bw, uid + 'c');
+      const curRes = sparkSeriesSVG(curPts, 'bar', null, kpi.curSparkBarStyle, null, accentColor, h, bw * 0.55, bw, uid + 'u');
+      body += cmpRes.html + curRes.html;
+      defs += cmpRes.defs + curRes.defs;
+    } else {
+      if (cmpOn) {
+        const slot = w / Math.max(cmpPts.length, 1);
+        const res = sparkSeriesSVG(cmpPts, kpi.cmpSparkChartType, kpi.cmpSparkLineStyle, kpi.cmpSparkBarStyle, kpi.cmpSparkAreaStyle, cmpColor, h, 0, slot * 0.6, uid + 'c');
+        body += res.html; defs += res.defs;
+      }
+      if (curOn) {
+        const slot = w / Math.max(curPts.length, 1);
+        const res = sparkSeriesSVG(curPts, kpi.curSparkChartType, kpi.curSparkLineStyle, kpi.curSparkBarStyle, kpi.curSparkAreaStyle, accentColor, h, 0, slot * 0.6, uid + 'u');
+        body += res.html; defs += res.defs;
+      }
+    }
+
+    let dots = '';
+    if (withHitCircles) {
+      if (curOn) dots += curPts.map((p, i) => '<circle class="hit" cx="' + p.x.toFixed(1) + '" cy="' + p.y.toFixed(1) + '" r="5" fill="transparent" data-kpi-id="' + kpi.id + '" data-series="current" data-point-index="' + i + '"></circle>').join('');
+      if (cmpOn) dots += cmpPts.map((p, i) => '<circle class="hit" cx="' + p.x.toFixed(1) + '" cy="' + p.y.toFixed(1) + '" r="5" fill="transparent" data-kpi-id="' + kpi.id + '" data-series="comparison" data-point-index="' + i + '"></circle>').join('');
+    }
+
+    return '<svg class="k-spark" viewBox="0 0 ' + w + ' ' + h + '" preserveAspectRatio="none">' +
+      (defs ? '<defs>' + defs + '</defs>' : '') + body + dots + '</svg>';
+  }
+
+  // Compact display format for a Y-axis min/max label - not a replica of Tableau's own
+  // number formatting (see formatMetricValue for that), just a legible approximation since
+  // a sparkline's plotted values don't carry a formatted-string sample to match.
+  function formatAxisValue(value) {
+    return new Intl.NumberFormat(undefined, { notation: 'compact', maximumFractionDigits: 1 }).format(value);
+  }
+
+  // Mirrors buildSparklineSVG's own curOn/cmpOn gating so the labels reflect exactly what
+  // was actually plotted (a series toggled off, or with too few points, contributes nothing).
+  // X-axis dates are read from each trend's own fieldsMap (the date field's real Tableau-
+  // formatted string), so labels follow whatever date format is set on the field in the
+  // data pane rather than a hardcoded one - not `.date` (the raw sort value).
+  function buildAxisLabelsHtml(kpi, currentTrend, comparisonTrend) {
+    if (!kpi.sparkShowYAxis && !kpi.sparkShowXAxis) return { y: '', x: '' };
+    const curOn = kpi.sparklineEnabled && currentTrend && currentTrend.length > 1;
+    const cmpOn = kpi.comparisonSparkEnabled && comparisonTrend && comparisonTrend.length > 1;
+    let y = '', x = '';
+    if (kpi.sparkShowYAxis) {
+      const allVals = [].concat(curOn ? currentTrend.map(t => t.value) : []).concat(cmpOn ? comparisonTrend.map(t => t.value) : []);
+      if (allVals.length) {
+        y = '<div class="k-axis-y"><span>' + escapeHtml(formatAxisValue(Math.max(...allVals))) + '</span><span>' + escapeHtml(formatAxisValue(Math.min(...allVals))) + '</span></div>';
+      }
+    }
+    if (kpi.sparkShowXAxis) {
+      const dateTrend = curOn ? currentTrend : (cmpOn ? comparisonTrend : null);
+      const dateField = curOn ? kpi.trendDateField : kpi.cmpTrendDateField;
+      if (dateTrend && dateTrend.length > 1) {
+        const first = dateTrend[0].fieldsMap[dateField] || '';
+        const last = dateTrend[dateTrend.length - 1].fieldsMap[dateField] || '';
+        x = '<div class="k-axis-x"><span>' + escapeHtml(first) + '</span><span>' + escapeHtml(last) + '</span></div>';
+      }
+    }
+    return { y, x };
+  }
+
+  // ---------- Measure Names/Measure Values support ----------
+  // A worksheet built with the "Measure Values" shelf (multiple measures dropped in,
+  // "Measure Names" as the identifying dimension) returns one ROW per measure - "Measure
+  // Names" holds which measure (e.g. "SUM(Sales)") and "Measure Values" holds its number -
+  // instead of one column per measure. Everything downstream expects the wide shape (one
+  // column per measure), so this pivots long -> wide right at the read boundary: each
+  // distinct Measure Names value becomes its own synthetic column, grouped by whatever
+  // other columns are present (e.g. a Date field).
+  function pivotMeasureNames(table) {
+    const mnIdx = table.columns.findIndex(c => c.fieldName === 'Measure Names');
+    const mvIdx = table.columns.findIndex(c => c.fieldName === 'Measure Values');
+    if (mnIdx === -1 || mvIdx === -1) return table;
+
+    const otherIdxs = table.columns.map((_, i) => i).filter(i => i !== mnIdx && i !== mvIdx);
+    const otherCols = otherIdxs.map(i => table.columns[i]);
+
+    const measureNames = [];
+    const seenNames = new Set();
+    const groups = new Map();
+    const order = [];
+    table.data.forEach(row => {
+      const name = row[mnIdx].formattedValue || String(row[mnIdx].value);
+      if (!seenNames.has(name)) { seenNames.add(name); measureNames.push(name); }
+      const key = otherIdxs.map(i => String(row[i].value)).join('');
+      if (!groups.has(key)) { groups.set(key, { otherValues: otherIdxs.map(i => row[i]), measures: {} }); order.push(key); }
+      groups.get(key).measures[name] = row[mvIdx];
+    });
+
+    const columns = otherCols.concat(measureNames.map(name => ({ fieldName: name })));
+    const data = order.map(key => {
+      const g = groups.get(key);
+      return g.otherValues.concat(measureNames.map(name => g.measures[name] || { value: null, formattedValue: '' }));
+    });
+
+    return Object.assign({}, table, { columns, data });
+  }
+
+  // ---------- Data loading ----------
+  async function loadWorksheetTable(wsName) {
+    if (worksheetTables[wsName]) return worksheetTables[wsName];
+    const ws = dashboard.worksheets.find(w => w.name === wsName);
+    if (!ws) return null;
+    const table = pivotMeasureNames(await ws.getSummaryDataAsync({ ignoreSelection: true }));
+    const rows = table.data.map(row => {
+      const fieldsMap = {}, valuesMap = {};
+      table.columns.forEach((c, i) => { fieldsMap[c.fieldName] = row[i].formattedValue; valuesMap[c.fieldName] = row[i].value; });
+      return { fieldsMap, valuesMap };
+    });
+    const result = { rows };
+    worksheetTables[wsName] = result;
+    return result;
+  }
+
+  // ---------- BAN aggregation period ----------
+  // Which rows (by date) feed the BAN's big number and its comparison value. "latest" is a
+  // single point; the rest sum every date-bucketed row falling in the window - the last N
+  // buckets for last3/6/12, or the calendar period containing the most recent date present
+  // in that series (not today's real date, since a worksheet's data is very often not
+  // current through today) for qtd/mtd/ytd. Each series (current vs. comparison) is
+  // aggregated independently, anchored on its own latest date - so a comparison series
+  // dated a year earlier still gets its own correct "that year's YTD", not zero rows from
+  // being compared against the current series' year boundary.
+  function pointsInWindow(points, period) {
+    if (!points.length) return [];
+    if (period === 'latest') return [points[points.length - 1]];
+
+    const lastN = { last3: 3, last6: 6, last12: 12 }[period];
+    if (lastN) return points.slice(-lastN);
+
+    const anchorDate = points[points.length - 1].date;
+    if (!(anchorDate instanceof Date)) return [points[points.length - 1]];
+
+    let periodStart;
+    if (period === 'mtd') periodStart = new Date(anchorDate.getFullYear(), anchorDate.getMonth(), 1);
+    else if (period === 'qtd') periodStart = new Date(anchorDate.getFullYear(), Math.floor(anchorDate.getMonth() / 3) * 3, 1);
+    else periodStart = new Date(anchorDate.getFullYear(), 0, 1); // ytd
+
+    return points.filter(p => p.date instanceof Date && p.date >= periodStart && p.date <= anchorDate);
+  }
+
+  // Combines whichever points fall in the window using aggFn ('sum'/'avg'/'min'/'max' -
+  // see guessAggFn). Which function is actually correct depends on the field: summing an
+  // average, or a table calculation like WINDOW_SUM/RUNNING_SUM/RANK that's already
+  // computed relative to the current view, produces a number with no real meaning - the
+  // Extensions API doesn't expose enough field metadata for a worksheet read this way to
+  // detect that automatically, so it's always inferred from the field's own name
+  // (guessAggFn) rather than user-overridable - a calculated ratio field like
+  // SUM(Sales)/SUM(Orders) never matches that naming convention, so it's never summed or
+  // averaged here, and always reads as "latest" instead.
+  function aggregateByPeriod(points, period, aggFn) {
+    if (!points.length) return NaN;
+    if (!aggFn) return points[points.length - 1].value;
+    const window = pointsInWindow(points, period);
+    if (!window.length) return NaN;
+    const values = window.map(p => p.value);
+    if (aggFn === 'avg') return values.reduce((sum, v) => sum + v, 0) / values.length;
+    if (aggFn === 'min') return Math.min(...values);
+    if (aggFn === 'max') return Math.max(...values);
+    return values.reduce((sum, v) => sum + v, 0); // sum
+  }
+
+  // The sole (non-overridable) source of which function is safe to combine a field's values
+  // with - inferred from its own name (Tableau's summary-data column names are typically
+  // "SUM(Sales)", "AVG(Rating)", etc.). Table calculations and calculated fields (including
+  // ratio/AGG() calcs like SUM(Sales)/SUM(Orders)) don't follow this convention and
+  // correctly fall through to null - the caller then always reads "latest" for them.
+  function guessAggFn(fieldName) {
+    const name = String(fieldName || '');
+    if (/^(SUM|CNT|COUNT|CNTD|COUNTD)\(/i.test(name)) return 'sum';
+    if (/^(AVG|AVERAGE|MEDIAN)\(/i.test(name)) return 'avg';
+    if (/^MIN\(/i.test(name)) return 'min';
+    if (/^MAX\(/i.test(name)) return 'max';
+    return null;
+  }
+
+  const VALUE_ABBREVIATIONS = [
+    { threshold: 1e12, letter: 'T' },
+    { threshold: 1e9, letter: 'B' },
+    { threshold: 1e6, letter: 'M' },
+    { threshold: 1e3, letter: 'K' },
+  ];
+
+  // Formats a value (the plain "latest" reading, or a summed/averaged one) to match the
+  // style of a single already-formatted sample (e.g. "$128.40", "12.3%", "$10,000") -
+  // detects a currency/text prefix, a percent suffix, and the native decimal precision, and
+  // reproduces them around the new number. Abbreviation is decided fresh from rawValue's own
+  // magnitude (>= 1 trillion/billion/million/thousand -> T/B/M/K), not copied from the
+  // sample, so a value under 1,000 always shows the field's plain native format. customPrefix,
+  // when non-empty, replaces the auto-detected prefix outright. A heuristic, not a full
+  // replica of Tableau's number-formatting engine.
+  function formatMetricValue(rawValue, sampleFormatted, customPrefix) {
+    const match = String(sampleFormatted || '').match(/^([^\d-]*)([\d.,-]+)\s*[KMBT]?\s*(%?)$/i);
+    if (!match) return (customPrefix || '') + String(rawValue);
+    const autoPrefix = match[1], digits = match[2], pctSuffix = match[3];
+    const prefix = customPrefix || autoPrefix;
+    const decimalMatch = digits.match(/\.(\d+)$/);
+    const sampleDecimals = decimalMatch ? decimalMatch[1].length : 0;
+
+    if (pctSuffix) {
+      // Tableau stores a percent-formatted field's raw value as a 0-1 fraction (0.35), not
+      // the displayed number (35.0), and percentages aren't truncated to K/M/B/T.
+      const scaled = rawValue * 100;
+      const numStr = scaled.toLocaleString(undefined, { minimumFractionDigits: sampleDecimals, maximumFractionDigits: sampleDecimals });
+      return prefix + numStr + pctSuffix;
+    }
+
+    const abbrev = VALUE_ABBREVIATIONS.find(a => Math.abs(rawValue) >= a.threshold);
+    const scaled = abbrev ? rawValue / abbrev.threshold : rawValue;
+    const decimals = abbrev ? Math.max(sampleDecimals, 1) : sampleDecimals;
+    const numStr = scaled.toLocaleString(undefined, { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
+    return prefix + numStr + (abbrev ? abbrev.letter : '');
+  }
+
+  function buildTrendSeries(wsName, dateField, valueField) {
+    const table = worksheetTables[wsName];
+    if (!table) return [];
+    return table.rows
+      .filter(r => r.valuesMap[valueField] != null && r.valuesMap[dateField] != null)
+      .map(r => ({
+        date: r.valuesMap[dateField],
+        value: Number(r.valuesMap[valueField]),
+        fieldsMap: r.fieldsMap,
+      }))
+      .sort((a, b) => {
+        if (a.date instanceof Date && b.date instanceof Date) return a.date - b.date;
+        return String(a.date).localeCompare(String(b.date));
+      });
+  }
+
+  function buildKpiData(kpi) {
+    const table = worksheetTables[kpi.worksheet];
+    if (!table || !table.rows.length) return null;
+    const row = table.rows[0];
+    if (row.valuesMap[kpi.currentField] == null) return null;
+
+    const label = kpi.labelMode === 'custom' ? (kpi.customLabel || '') : (row.fieldsMap[kpi.labelField] || '');
+
+    // Trend data is loaded (see loadAndRender's wsNames set) whenever it's needed either to
+    // draw the sparkline or to compute an aggregated BAN value - those are independent
+    // toggles, since aggregation period doesn't require the sparkline to actually be shown.
+    let trend = [];
+    if ((kpi.sparklineEnabled || kpi.aggregationPeriod !== 'latest') && kpi.trendWorksheet) {
+      trend = buildTrendSeries(kpi.trendWorksheet, kpi.trendDateField, kpi.trendValueField);
+    }
+    let comparisonTrend = [];
+    if ((kpi.comparisonSparkEnabled || (kpi.aggregationPeriod !== 'latest' && kpi.comparisonMode === 'field')) && kpi.cmpTrendWorksheet) {
+      comparisonTrend = buildTrendSeries(kpi.cmpTrendWorksheet, kpi.cmpTrendDateField, kpi.cmpTrendValueField);
+    }
+
+    let value = Number(row.valuesMap[kpi.currentField]);
+    if (kpi.aggregationPeriod !== 'latest' && trend.length) {
+      const agg = aggregateByPeriod(trend, kpi.aggregationPeriod, guessAggFn(kpi.currentField));
+      if (!Number.isNaN(agg)) value = agg;
+    }
+    const formattedValue = formatMetricValue(value, row.fieldsMap[kpi.currentField], kpi.customPrefix);
+
+    let comparison = null;
+    if (kpi.comparisonMode === 'fixed') comparison = Number(kpi.comparisonFixed);
+    else if (kpi.comparisonMode === 'field' && row.valuesMap[kpi.comparisonField] != null) comparison = Number(row.valuesMap[kpi.comparisonField]);
+    if (kpi.comparisonMode === 'field' && kpi.aggregationPeriod !== 'latest' && comparisonTrend.length) {
+      const aggCmp = aggregateByPeriod(comparisonTrend, kpi.aggregationPeriod, guessAggFn(kpi.comparisonField));
+      if (!Number.isNaN(aggCmp)) comparison = aggCmp;
+    }
+
+    const supportingValues = {};
+    (kpi.supportingMetrics || []).forEach(sm => {
+      if (row.fieldsMap[sm.field] != null) supportingValues[sm.field] = row.fieldsMap[sm.field];
+    });
+
+    return { label, value, formattedValue, comparison, supportingValues, trend, comparisonTrend, tooltipFieldsMap: row.fieldsMap };
+  }
+
+  // ---------- Card rendering ----------
+  function buildCardHTML(kpi, colorIdx, data) {
+    const palette = currentPalette();
+    const radius = cfg.cornerRadius + 'px';
+    let boxShadow = 'none', border = 'none';
+    if (cfg.cardStyle === 'shadow') boxShadow = '0 1px 3px rgba(0,0,0,.12), 0 1px 2px rgba(0,0,0,.08)';
+    if (cfg.cardStyle === 'outlined') border = '1px solid #e2e5e9';
+    const bg = cfg.cardTransparent ? 'transparent' : cfg.cardBg;
+    const colors = cardColors(kpi);
+    const clickable = kpi.filterEnabled || kpi.parameterEnabled;
+    const isActive = activeCardId === kpi.id;
+    const minHeightStyle = cfg.cardMinHeight ? ';min-height:' + cfg.cardMinHeight + 'px' : '';
+
+    // This card's own performance vs its comparison period - computed up front since it
+    // drives not just the delta text but, optionally, the accent and sparkline colors too.
+    let hasComparison = false, isGood = true, pct = 0;
+    if (kpi.comparisonMode !== 'none' && data.comparison != null && !Number.isNaN(data.comparison)) {
+      hasComparison = true;
+      pct = data.comparison !== 0 ? ((data.value - data.comparison) / Math.abs(data.comparison)) * 100 : 0;
+      const risingIsGood = kpi.goodDirection !== 'down';
+      isGood = risingIsGood ? pct >= 0 : pct <= 0;
+    }
+
+    const paletteAccent = palette.colors[colorIdx % palette.colors.length];
+    const accentColorMode = cfg.colorMode === 'individual' ? kpi.accentColorMode : 'palette';
+    let accent = paletteAccent;
+    if (accentColorMode === 'custom') accent = kpi.accentColor;
+    else if (accentColorMode === 'conditional') accent = hasComparison ? (isGood ? colors.pos : colors.neg) : paletteAccent;
+
+    const curSparkColorMode = cfg.colorMode === 'individual' ? kpi.curSparkColorMode : 'neutral';
+    const curSparkColor = curSparkColorMode === 'conditional' ? (hasComparison ? (isGood ? colors.pos : colors.neg) : kpi.curSparkColor) : kpi.curSparkColor;
+
+    let deltaHtml = '';
+    if (hasComparison) {
+      const arrow = cfg.showTrendArrow ? (pct >= 0 ? '▲' : '▼') + ' ' : '';
+      const color = isGood ? colors.pos : colors.neg;
+      const labelSuffix = cfg.comparisonLabel ? ' ' + escapeHtml(cfg.comparisonLabel) : '';
+      deltaHtml = '<div class="k-delta" style="color:' + color + '">' + arrow + Math.abs(pct).toFixed(1) + '%' + labelSuffix + '</div>';
+    }
+
+    let supportHtml = '';
+    if (kpi.supportingMetrics && kpi.supportingMetrics.length) {
+      supportHtml = kpi.supportingMetrics.map(sm => {
+        const v = data.supportingValues[sm.field];
+        if (v == null) return '';
+        return '<div class="k-support">' + escapeHtml(sm.label || sm.field) + ': ' + escapeHtml(v) + '</div>';
+      }).join('');
+    }
+
+    const hasSparkTip = kpi.sparkTooltipEnabled && kpi.sparkTooltipTemplate;
+    const sparkHtml = buildSparklineSVG(kpi, data.trend, data.comparisonTrend, curSparkColor, hasSparkTip);
+    const axisLabels = sparkHtml ? buildAxisLabelsHtml(kpi, data.trend, data.comparisonTrend) : { y: '', x: '' };
+
+    const accentBar = cfg.accentMode === 'top' ? '<div class="accent-top" style="background:' + accent + '"></div>'
+      : cfg.accentMode === 'left' ? '<div class="accent-left" style="background:' + accent + '"></div>' : '';
+    const valueColor = cfg.accentMode === 'value' ? accent : cfg.cardText;
+
+    const rightLayout = cfg.sparklinePosition === 'right';
+    const mainHtml = '<div class="k-main">' +
+      '<div class="k-label" style="font-size:' + cfg.labelFontSize + 'px">' + escapeHtml(data.label) + '</div>' +
+      '<div class="k-value" style="font-size:' + cfg.valueFontSize + 'px;font-weight:' + cfg.valueFontWeight + ';color:' + valueColor + '">' + escapeHtml(data.formattedValue) + '</div>' +
+      deltaHtml + supportHtml +
+      '</div>';
+    const sparkWrapped = sparkHtml
+      ? '<div class="k-spark-wrap' + (rightLayout ? ' right' : ' below') + '"><div class="k-spark-inner"><div class="k-spark-row">' + axisLabels.y + sparkHtml + '</div>' + axisLabels.x + '</div></div>'
+      : '';
+
+    const captionHtml = kpi.captionEnabled && kpi.captionTemplate
+      ? '<div class="k-caption">' + substituteTooltipChips(kpi.captionTemplate, data.tooltipFieldsMap || {}) + '</div>'
+      : '';
+
+    return '<div class="kpi-card' + (clickable ? ' clickable' : '') + (isActive ? ' active' : '') +
+      '" data-kpi-id="' + kpi.id + '" style="background:' + bg + ';border-radius:' + radius + ';box-shadow:' + boxShadow +
+      ';border:' + border + ';color:' + cfg.cardText + ';font-family:' + cfg.fontFamily + minHeightStyle + '">' +
+      accentBar +
+      '<div class="k-body ' + (rightLayout ? 'right' : 'below') + '">' + mainHtml + sparkWrapped + '</div>' +
+      captionHtml +
+      '</div>';
+  }
+
+  // ---------- Full load + render ----------
+  async function loadAndRender() {
+    if (!isConfigured()) { renderUnconfigured(); return; }
+
+    const wsNames = new Set();
+    cfg.kpis.forEach(k => {
+      wsNames.add(k.worksheet);
+      if ((k.sparklineEnabled || k.aggregationPeriod !== 'latest') && k.trendWorksheet) wsNames.add(k.trendWorksheet);
+      if ((k.comparisonSparkEnabled || (k.aggregationPeriod !== 'latest' && k.comparisonMode === 'field')) && k.cmpTrendWorksheet) wsNames.add(k.cmpTrendWorksheet);
+    });
+
+    worksheetTables = {};
+    try {
+      await Promise.all(Array.from(wsNames).map(loadWorksheetTable));
+    } catch (e) {
+      renderError('Could not read data from one of the configured worksheets: ' + e.message);
+      return;
+    }
+
+    const missing = cfg.kpis.filter(k => !worksheetTables[k.worksheet]);
+    if (missing.length) {
+      renderUnconfigured('Worksheet "' + missing[0].worksheet + '" was not found on this dashboard. It may have been renamed or removed.');
+      return;
+    }
+
+    const cardsData = cfg.kpis.map(kpi => ({ kpi, data: buildKpiData(kpi) }));
+
+    const grid = document.createElement('div');
+    grid.className = 'grid';
+    grid.style.gridTemplateColumns = cfg.autoFitColumns
+      ? 'repeat(auto-fit, minmax(' + (cfg.cardMinWidth || 180) + 'px, 1fr))'
+      : 'repeat(' + cfg.cardsPerRow + ', minmax(0, 1fr))';
+    grid.style.gap = cfg.cardGap + 'px';
+    grid.innerHTML = cardsData.map(({ kpi, data }, i) =>
+      data ? buildCardHTML(kpi, i, data) : ''
+    ).join('');
+    content.innerHTML = '';
+    content.appendChild(grid);
+
+    wireCardInteractions(cardsData);
+    equalizeCardHeights();
+  }
+
+  // ---------- Equal card height ----------
+  // Cards should always share one height, sized to the tallest one - CSS Grid only
+  // stretches items to match within the *same* row, not across independently-wrapped rows,
+  // so this measures instead. Resets each card's height to natural first (clearing any
+  // uniform height applied by a previous pass) before measuring, so a resize-triggered
+  // re-run (content reflowing at a new width) still gets each card's true natural height
+  // rather than whatever was last applied.
+  function equalizeCardHeights() {
+    const cardEls = content.querySelectorAll('.kpi-card');
+    if (!cardEls.length) return;
+    let max = cfg.cardMinHeight || 0;
+    cardEls.forEach(el => { el.style.height = ''; max = Math.max(max, el.scrollHeight); });
+    cardEls.forEach(el => { el.style.height = max + 'px'; });
+  }
+
+  let equalizeResizeTimer = null;
+  window.addEventListener('resize', () => {
+    clearTimeout(equalizeResizeTimer);
+    equalizeResizeTimer = setTimeout(equalizeCardHeights, 150);
+  });
+
+  function wireCardInteractions(cardsData) {
+    const byId = new Map(cardsData.map(c => [c.kpi.id, c]));
+
+    content.querySelectorAll('.kpi-card').forEach(cardEl => {
+      const id = cardEl.getAttribute('data-kpi-id');
+      const entry = byId.get(id);
+      if (!entry) return;
+      const { kpi, data } = entry;
+
+      cardEl.addEventListener('mousemove', e => {
+        const pointEl = e.target.closest('circle[data-point-index]');
+        if (pointEl && kpi.sparkTooltipEnabled && kpi.sparkTooltipTemplate) {
+          const idx = parseInt(pointEl.getAttribute('data-point-index'), 10);
+          const series = pointEl.getAttribute('data-series');
+          const point = series === 'comparison' ? data.comparisonTrend[idx] : data.trend[idx];
+          if (point) showTip(substituteTooltipChips(kpi.sparkTooltipTemplate, point.fieldsMap), e.clientX, e.clientY);
+          return;
+        }
+        if (kpi.tooltipEnabled && kpi.tooltipTemplate) {
+          showTip(substituteTooltipChips(kpi.tooltipTemplate, data.tooltipFieldsMap), e.clientX, e.clientY);
+        } else {
+          hideTip();
+        }
+      });
+      cardEl.addEventListener('mouseleave', hideTip);
+
+      if (kpi.filterEnabled || kpi.parameterEnabled) {
+        cardEl.addEventListener('click', () => onCardClick(kpi, data));
+      }
+    });
+  }
+
+  async function onCardClick(kpi, data) {
+    const wasActive = activeCardId === kpi.id;
+    activeCardId = wasActive ? null : kpi.id;
+    content.querySelectorAll('.kpi-card').forEach(el => {
+      el.classList.toggle('active', el.getAttribute('data-kpi-id') === activeCardId);
+    });
+
+    if (kpi.filterEnabled && kpi.filterField) {
+      const targets = kpi.filterWorksheets || [];
+      const filterValue = kpi.filterValueField ? data.tooltipFieldsMap[kpi.filterValueField] : data.label;
+      for (const wsName of targets) {
+        const ws = dashboard.worksheets.find(w => w.name === wsName);
+        if (!ws) continue;
+        try {
+          if (wasActive) await ws.clearFilterAsync(kpi.filterField);
+          else await ws.applyFilterAsync(kpi.filterField, [filterValue], tableau.FilterUpdateType.Replace);
+        } catch (e) { /* field may not exist on that sheet - ignore */ }
+      }
+    }
+
+    if (!wasActive && kpi.parameterEnabled && kpi.parameterName) {
+      try {
+        const params = await dashboard.getParametersAsync();
+        const param = params.find(p => p.name === kpi.parameterName);
+        if (param) {
+          let value;
+          if (kpi.parameterValueSource === 'value') value = data.value;
+          else if (kpi.parameterValueSource === 'fixed') value = kpi.parameterFixedValue;
+          else value = data.label;
+          await param.changeValueAsync(value);
+        }
+      } catch (e) { /* parameter may reject the value type - ignore */ }
+    }
+  }
+
+  function bindWorksheetEvents() {
+    dashboard.worksheets.forEach(ws => {
+      ws.removeEventListener(tableau.TableauEventType.SummaryDataChanged, loadAndRender);
+    });
+    if (!cfg) return;
+    const relevant = new Set();
+    cfg.kpis.forEach(k => {
+      relevant.add(k.worksheet);
+      if ((k.sparklineEnabled || k.aggregationPeriod !== 'latest') && k.trendWorksheet) relevant.add(k.trendWorksheet);
+      if ((k.comparisonSparkEnabled || (k.aggregationPeriod !== 'latest' && k.comparisonMode === 'field')) && k.cmpTrendWorksheet) relevant.add(k.cmpTrendWorksheet);
+    });
+    dashboard.worksheets.forEach(ws => {
+      if (relevant.has(ws.name)) ws.addEventListener(tableau.TableauEventType.SummaryDataChanged, loadAndRender);
+    });
+  }
+
+  function onSettingsChanged() {
+    loadConfig();
+    bindWorksheetEvents();
+    loadAndRender();
+  }
+
+  async function openConfigure() {
+    const payload = JSON.stringify(cfg || {});
+    try {
+      const result = await tableau.extensions.ui.displayDialogAsync(
+        './config.html', payload, { height: 680, width: 940 }
+      );
+      if (!result) return;
+      cfg = JSON.parse(result);
+      tableau.extensions.settings.set('config', JSON.stringify(cfg));
+      await tableau.extensions.settings.saveAsync();
+      bindWorksheetEvents();
+      await loadAndRender();
+    } catch (e) {
+      // user cancelled the dialog - ErrorCodes.DialogClosedByUser - nothing to do
+    }
+  }
+
+  async function init() {
+    await tableau.extensions.initializeAsync({ configure: openConfigure });
+    dashboard = tableau.extensions.dashboardContent.dashboard;
+    loadConfig();
+    bindWorksheetEvents();
+    await loadAndRender();
+
+    document.getElementById('configureBtn').addEventListener('click', openConfigure);
+    tableau.extensions.settings.addEventListener(tableau.TableauEventType.SettingsChanged, onSettingsChanged);
+  }
+
+  init().catch(e => renderError('Failed to load: ' + e.message));
+</script>
+</body>
+</html>

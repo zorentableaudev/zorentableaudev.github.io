@@ -1,0 +1,1716 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>KPI Cards - Configure</title>
+<script src="./tableau.extensions.1.latest.min.js"></script>
+<script src="./palettes.js"></script>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    font-size: 13px;
+    color: #1a1a1a;
+    background: #fff;
+    height: 100vh;
+    overflow: hidden;
+  }
+  #app { display: flex; flex-direction: column; height: 100vh; }
+
+  .topbar {
+    background: #1e6eb5;
+    color: #fff;
+    padding: 10px 16px;
+    flex-shrink: 0;
+  }
+  .topbar h1 { font-size: 14px; font-weight: 700; letter-spacing: .2px; }
+  .topbar p { font-size: 11px; opacity: .85; margin-top: 2px; }
+
+  .body { flex: 1; display: flex; min-height: 0; }
+
+  .rail { width: 132px; flex-shrink: 0; background: #f6f7f9; border-right: 1px solid #e2e5e9; padding: 10px 0; }
+  .rail button {
+    display: block; width: 100%; text-align: left; padding: 9px 16px; border: none; background: none;
+    font-size: 12.5px; font-weight: 600; color: #555; cursor: pointer; border-left: 3px solid transparent;
+  }
+  .rail button:hover { background: #eef1f4; }
+  .rail button.active { color: #1e6eb5; background: #eaf2fb; border-left-color: #1e6eb5; }
+
+  .panel { flex: 1; overflow-y: auto; padding: 16px 18px; min-width: 0; }
+  .tabpane { display: none; }
+  .tabpane.active { display: block; }
+
+  .preview { width: 300px; flex-shrink: 0; background: #fafbfc; border-left: 1px solid #e2e5e9; padding: 16px; overflow-y: auto; }
+  .preview h2 { font-size: 10px; text-transform: uppercase; letter-spacing: .4px; color: #888; margin-bottom: 10px; }
+  #previewCards { display: flex; flex-direction: column; gap: 12px; }
+  .preview-note { font-size: 10.5px; color: #999; margin-top: 8px; }
+
+  h2.section { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .4px; color: #555; margin: 18px 0 8px; }
+  h2.section:first-child { margin-top: 0; }
+  h3.subsection { font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .3px; color: #777; margin: 14px 0 6px; }
+  h4.subsubsection { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .3px; color: #999; margin: 10px 0 5px; }
+  p.hint { font-size: 11px; color: #666; margin: 2px 0 8px; }
+
+  label.field-label {
+    display: block; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .3px;
+    color: #555; margin: 12px 0 4px;
+  }
+  label.field-label:first-of-type { margin-top: 0; }
+  select, input[type=text], input[type=number] {
+    width: 100%; padding: 7px 8px; border: 1px solid #ccd1d9; border-radius: 4px;
+    font-size: 13px; font-family: inherit; background: #fff;
+  }
+  .row { display: flex; gap: 10px; }
+  .row > div { flex: 1; }
+
+  label.checkbox {
+    display: flex; align-items: center; gap: 6px; font-size: 12.5px; font-weight: 400; color: #1a1a1a;
+    margin: 10px 0; cursor: pointer;
+  }
+  label.checkbox input { width: auto; }
+
+  .color-field { display: flex; align-items: center; gap: 8px; margin: 12px 0 4px; }
+  .color-field label { flex: 1; margin: 0; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .3px; color: #555; }
+  .color-field input[type=color] { width: 34px; height: 26px; padding: 0; border: 1px solid #ccd1d9; border-radius: 4px; cursor: pointer; }
+
+  .color-swatches { display: flex; flex-wrap: wrap; gap: 4px; margin: 0 0 10px; }
+  .color-swatches .swatch-pick {
+    width: 16px; height: 16px; border-radius: 50%; border: 1px solid rgba(0,0,0,.15); padding: 0; cursor: pointer;
+  }
+  .color-swatches .swatch-pick:hover { transform: scale(1.15); }
+  .color-swatches .swatch-pick.selected { outline: 2px solid #1e6eb5; outline-offset: 1px; }
+
+  .palette-search { margin-bottom: 8px; }
+  .palette-list { border: 1px solid #e2e5e9; border-radius: 5px; max-height: 260px; overflow-y: auto; }
+  .palette-row { display: flex; align-items: center; gap: 8px; padding: 6px 10px; border-bottom: 1px solid #f0f1f3; cursor: pointer; }
+  .palette-row:last-child { border-bottom: none; }
+  .palette-row:hover { background: #f7fafd; }
+  .palette-row.selected { background: #eaf2fb; }
+  .palette-row .swatches { display: flex; gap: 2px; flex-shrink: 0; }
+  .palette-row .swatch { width: 12px; height: 12px; border-radius: 50%; border: 1px solid rgba(0,0,0,.08); }
+  .palette-row .pname { flex: 1; font-size: 11.5px; color: #333; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .palette-row .ptype { font-size: 9px; text-transform: uppercase; letter-spacing: .3px; color: #999; flex-shrink: 0; }
+  .palette-selected-label { font-size: 12px; margin-top: 8px; color: #333; }
+  .palette-selected-label b { color: #1e6eb5; }
+
+  .actions-bar {
+    flex-shrink: 0; border-top: 1px solid #e2e5e9; padding: 10px 16px;
+    display: flex; justify-content: flex-end; gap: 8px; background: #fff;
+  }
+  button.primary, button.secondary, button.tiny {
+    padding: 8px 16px; border-radius: 4px; border: 1px solid transparent; font-size: 13px; cursor: pointer;
+  }
+  button.primary { background: #1e6eb5; color: #fff; }
+  button.primary:disabled { background: #a9c6e2; cursor: not-allowed; }
+  button.secondary { background: #f0f2f5; color: #333; border-color: #ccd1d9; }
+  button.tiny { padding: 4px 9px; font-size: 11px; }
+  .error { color: #b3261e; font-size: 11px; padding: 0 16px 8px; }
+
+  /* ---- KPI list (add/remove, accordion) ---- */
+  .add-kpi-btn {
+    width: 100%; padding: 9px; border: 1px dashed #9fb8cc; border-radius: 5px; background: #f7fafd;
+    color: #1e6eb5; font-size: 12.5px; font-weight: 600; cursor: pointer; margin-bottom: 12px;
+  }
+  .add-kpi-btn:hover { background: #eaf2fb; }
+  .kpi-list { border: 1px solid #e2e5e9; border-radius: 6px; overflow: hidden; }
+  .kpi-row {
+    display: flex; align-items: center; gap: 8px; padding: 9px 10px; background: #fff;
+    border-bottom: 1px solid #eef0f3; cursor: grab;
+  }
+  .kpi-row.dragging { opacity: .5; background: #eef4fb; }
+  .kpi-row .drag-handle { color: #99a1ab; font-size: 14px; letter-spacing: -1px; user-select: none; }
+  .kpi-row .kpi-name { flex: 1; font-size: 12.5px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .kpi-row .kpi-sub { font-size: 10.5px; color: #888; margin-left: 4px; }
+  .kpi-row button { background: none; border: 1px solid #ccd1d9; border-radius: 3px; padding: 3px 8px; font-size: 11px; cursor: pointer; color: #444; }
+  .kpi-row button.remove { color: #b3261e; border-color: #e6b8b4; }
+  .kpi-editor { background: #fafbfc; border-bottom: 1px solid #e2e5e9; padding: 14px; }
+  .kpi-list .kpi-row:last-child, .kpi-list .kpi-editor:last-child { border-bottom: none; }
+
+  .mini-list { border: 1px solid #e2e5e9; border-radius: 5px; margin-bottom: 6px; }
+  .mini-row { display: flex; gap: 6px; align-items: center; padding: 6px 8px; border-bottom: 1px solid #f0f1f3; }
+  .mini-row:last-child { border-bottom: none; }
+  .mini-row select, .mini-row input[type=text] { flex: 1; padding: 5px 6px; font-size: 12px; }
+  .mini-row button { flex-shrink: 0; }
+  .box { border: 1px solid #e2e5e9; border-radius: 5px; max-height: 130px; overflow-y: auto; padding: 6px 8px; }
+  .box label.checkbox { margin: 4px 0; }
+
+  .series-block { border: 1px solid #e2e5e9; border-radius: 6px; padding: 10px 10px 4px; margin-bottom: 10px; background: #fff; }
+  .series-block.comparison { background: #fbfbfc; }
+
+  /* ---- rich text tooltip editor ---- */
+  .tt-toolbar { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; border: 1px solid #ccd1d9; border-bottom: none; border-radius: 4px 4px 0 0; padding: 5px; background: #f6f7f9; }
+  .tt-toolbar button { border: 1px solid #ccd1d9; background: #fff; border-radius: 3px; width: 24px; height: 24px; cursor: pointer; font-size: 12px; }
+  .tt-toolbar button:hover { background: #eef1f4; }
+  .tt-toolbar select { width: auto; padding: 3px 4px; font-size: 11px; }
+  .tt-toolbar input[type=color] { width: 24px; height: 24px; padding: 0; border: 1px solid #ccd1d9; border-radius: 3px; cursor: pointer; }
+  .tt-editor {
+    border: 1px solid #ccd1d9; border-radius: 0 0 4px 4px; min-height: 70px; max-height: 160px; overflow-y: auto;
+    padding: 8px; font-size: 12px; line-height: 1.5;
+  }
+  .tt-editor:focus { outline: 2px solid #cfe0f2; }
+  .tt-field { display: inline-block; background: #eaf2fb; color: #1e6eb5; border-radius: 3px; padding: 0 4px; font-size: 11.5px; margin: 0 1px; }
+
+  .actions { flex-shrink: 0; }
+
+  /* --- KPI card rendering (shared visual spec with index.html) --- */
+  .kpi-card { position: relative; display: flex; flex-direction: column; padding: 14px 14px 12px; overflow: hidden; }
+  .kpi-card .accent-top { position: absolute; top: 0; left: 0; right: 0; height: 4px; }
+  .kpi-card .accent-left { position: absolute; top: 0; left: 0; bottom: 0; width: 4px; }
+  .kpi-card .k-label { font-size: 11px; text-transform: uppercase; letter-spacing: .3px; opacity: .7; margin-bottom: 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .kpi-card .k-value { font-weight: 700; line-height: 1.1; margin-bottom: 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .kpi-card .k-delta { font-size: 11px; font-weight: 600; display: inline-flex; align-items: center; gap: 3px; }
+  .kpi-card .k-support { font-size: 10.5px; opacity: .75; margin-top: 3px; }
+  .kpi-card .k-caption { font-size: 11px; margin-top: 8px; }
+  .kpi-card .k-spark { display: block; width: 100%; height: 100%; }
+  .k-body { display: flex; flex: 1 1 auto; min-height: 0; }
+  .k-body.below { flex-direction: column; }
+  .k-body.right { flex-direction: row; align-items: stretch; gap: 14px; }
+  .k-body .k-main { flex: 0 0 auto; min-width: 0; }
+  .k-spark-wrap.below { flex: 1 1 auto; min-height: 28px; margin-top: 6px; display: flex; align-items: stretch; }
+  .k-spark-wrap.right { flex: 1 1 auto; min-width: 60px; display: flex; align-items: stretch; }
+  .k-spark-inner { display: flex; flex-direction: column; flex: 1 1 auto; min-width: 0; min-height: 0; }
+  .k-spark-row { display: flex; align-items: stretch; gap: 3px; flex: 1 1 auto; min-width: 0; min-height: 0; }
+  .k-spark-row .k-spark { flex: 1 1 auto; min-width: 0; min-height: 0; width: auto; }
+  .k-axis-y { flex: 0 0 auto; display: flex; flex-direction: column; justify-content: space-between; align-items: flex-end; text-align: right; font-size: 9px; line-height: 1; opacity: .55; }
+  .k-axis-x { display: flex; justify-content: space-between; font-size: 9px; line-height: 1; opacity: .55; margin-top: 2px; flex: 0 0 auto; }
+</style>
+</head>
+<body>
+<div id="app">
+  <div class="topbar">
+    <h1 id="titlePreviewText">KPI Cards - Configure</h1>
+    <p>Add KPIs, wire up colors, fonts, tooltips, and actions. Changes preview live on the right.</p>
+  </div>
+
+  <div class="body">
+    <div class="rail">
+      <button class="tabbtn active" data-tab="title">Title</button>
+      <button class="tabbtn" data-tab="kpis">KPIs</button>
+      <button class="tabbtn" data-tab="color">Color</button>
+      <button class="tabbtn" data-tab="font">Font</button>
+      <button class="tabbtn" data-tab="layout">Layout</button>
+    </div>
+
+    <div class="panel">
+      <!-- TITLE TAB -->
+      <div class="tabpane active" id="tab-title">
+        <label class="checkbox"><input type="checkbox" id="showTitle" checked> Show extension title</label>
+        <label class="field-label" for="extTitle">Title text</label>
+        <input type="text" id="extTitle" placeholder="KPI Cards">
+
+        <label class="checkbox"><input type="checkbox" id="showConfigureButton" checked> Show "Configure" button</label>
+        <p class="hint">Independent of the title above - the right-click "Configure..." context menu item on the
+          extension itself always works regardless of either setting, so there's still a way back in even with
+          both hidden.</p>
+      </div>
+
+      <!-- KPIS TAB -->
+      <div class="tabpane" id="tab-kpis">
+        <button type="button" class="add-kpi-btn" id="addKpiBtn">+ Add KPI</button>
+        <div class="kpi-list" id="kpiList"></div>
+      </div>
+
+      <!-- COLOR TAB -->
+      <div class="tabpane" id="tab-color">
+        <h2 class="section">Color mode</h2>
+        <label class="field-label" for="colorMode">Apply colors</label>
+        <select id="colorMode">
+          <option value="uniform">The same, for every metric</option>
+          <option value="individual">Customized individually per metric</option>
+        </select>
+        <p class="hint">"Individual" unlocks per-KPI color overrides (including conditional accent/sparkline color) in each KPI's own editor, on the Metrics tab.</p>
+
+        <h2 class="section">Palette</h2>
+        <p class="hint">Every custom palette from your Tableau Preferences.tps (428 palettes). Colors cycle across cards as an accent.</p>
+        <input type="text" id="paletteSearch" class="palette-search" placeholder="Search palettes...">
+        <div class="palette-list" id="paletteList"></div>
+        <div class="palette-selected-label">Selected: <b id="paletteSelectedName">-</b></div>
+
+        <label class="field-label" for="accentMode" style="margin-top:16px;">Accent placement</label>
+        <select id="accentMode">
+          <option value="top">Top bar</option>
+          <option value="left">Left bar</option>
+          <option value="value">Value text color</option>
+          <option value="none">None</option>
+        </select>
+
+        <h2 class="section">Default status colors</h2>
+        <p class="hint">Used by any KPI that hasn't overridden colors, and by cards with "Up is good" vs "Down is
+          good" set per KPI in its own editor — these aren't hardcoded to red=bad/green=good.</p>
+        <div class="color-field"><label for="positiveColor">"Good" color</label><input type="color" id="positiveColor" value="#1a8a4a"></div>
+        <div class="color-swatches" data-target="positiveColor"></div>
+        <div class="color-field"><label for="negativeColor">"Bad" color</label><input type="color" id="negativeColor" value="#b3261e"></div>
+        <div class="color-swatches" data-target="negativeColor"></div>
+        <label class="checkbox"><input type="checkbox" id="showTrendArrow" checked> Show trend arrow on delta</label>
+
+        <label class="field-label" for="comparisonLabel">Comparison label text</label>
+        <input type="text" id="comparisonLabel" placeholder="vs comparison">
+        <p class="hint">Shown after the percent change, e.g. "12.3% up &lt;this text&gt;". Leave blank to hide it.</p>
+
+        <h2 class="section">Card colors</h2>
+        <label class="checkbox"><input type="checkbox" id="cardTransparent"> Transparent card background</label>
+        <div class="color-field"><label for="cardBg">Card background</label><input type="color" id="cardBg" value="#ffffff"></div>
+        <div class="color-swatches" data-target="cardBg"></div>
+        <div class="color-field"><label for="cardText">Card text</label><input type="color" id="cardText" value="#1a1a1a"></div>
+        <div class="color-swatches" data-target="cardText"></div>
+      </div>
+
+      <!-- FONT TAB -->
+      <div class="tabpane" id="tab-font">
+        <h2 class="section">Font family</h2>
+        <label class="field-label" for="fontFamily">Family</label>
+        <select id="fontFamily">
+          <option value="-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif">System Default</option>
+          <optgroup label="Tableau">
+            <option value="'Tableau Book',Arial,sans-serif">Tableau Book</option>
+            <option value="'Tableau Medium',Arial,sans-serif">Tableau Medium</option>
+            <option value="'Tableau Semibold',Arial,sans-serif">Tableau Semibold</option>
+            <option value="'Tableau Bold',Arial,sans-serif">Tableau Bold</option>
+            <option value="'Tableau Light',Arial,sans-serif">Tableau Light</option>
+          </optgroup>
+          <option value="Bahnschrift,'Segoe UI',sans-serif">Bahnschrift</option>
+          <option value="Arial,sans-serif">Arial</option>
+          <option value="'Helvetica Neue',Helvetica,sans-serif">Helvetica Neue</option>
+          <option value="'Segoe UI',sans-serif">Segoe UI</option>
+          <option value="Calibri,sans-serif">Calibri</option>
+          <option value="Tahoma,sans-serif">Tahoma</option>
+          <option value="Verdana,sans-serif">Verdana</option>
+          <option value="'Trebuchet MS',sans-serif">Trebuchet MS</option>
+          <option value="Georgia,serif">Georgia</option>
+          <option value="'Times New Roman',serif">Times New Roman</option>
+          <option value="'Courier New',monospace">Courier New</option>
+        </select>
+        <p class="hint">Tableau Book/Medium/Semibold/Bold/Light ship with Tableau Desktop and Server. Bahnschrift
+          ships with Windows 10+. Viewers without the font installed see the fallback instead.</p>
+
+        <h2 class="section">Sizes &amp; weight</h2>
+        <div class="row">
+          <div>
+            <label class="field-label" for="valueFontSize">Value size (px)</label>
+            <input type="number" id="valueFontSize" min="14" max="64" value="32">
+          </div>
+          <div>
+            <label class="field-label" for="labelFontSize">Label size (px)</label>
+            <input type="number" id="labelFontSize" min="8" max="20" value="11">
+          </div>
+        </div>
+        <label class="field-label" for="valueFontWeight">Value weight</label>
+        <select id="valueFontWeight">
+          <option value="400">Regular</option>
+          <option value="600">Semibold</option>
+          <option value="700" selected>Bold</option>
+          <option value="800">Extra Bold</option>
+        </select>
+      </div>
+
+      <!-- LAYOUT TAB -->
+      <div class="tabpane" id="tab-layout">
+        <h2 class="section">Grid</h2>
+        <label class="checkbox"><input type="checkbox" id="autoFitColumns" checked> Auto-fit columns to the extension window</label>
+        <p class="hint">Cards automatically resize and reflow to make the best use of
+          whatever space is available, based on how many are added — no empty gaps when
+          there are only a couple, more per row as you add more. Turn off for manual
+          control over exactly how many columns to show.</p>
+        <div class="row">
+          <div data-show-if-global="autoFitColumns:true">
+            <label class="field-label" for="cardMinWidth">Minimum card width (px)</label>
+            <input type="number" id="cardMinWidth" min="100" max="600" value="180">
+          </div>
+          <div data-show-if-global="autoFitColumns:false">
+            <label class="field-label" for="cardsPerRow">Cards per row</label>
+            <input type="number" id="cardsPerRow" min="1" max="8" value="4">
+          </div>
+          <div>
+            <label class="field-label" for="cardGap">Card spacing (px)</label>
+            <input type="number" id="cardGap" min="0" max="40" value="12">
+          </div>
+          <div>
+            <label class="field-label" for="cardMinHeight">Card min height (px)</label>
+            <input type="number" id="cardMinHeight" min="0" max="800" value="0" placeholder="0 = auto">
+          </div>
+        </div>
+
+        <h2 class="section">Sparkline placement</h2>
+        <label class="field-label" for="sparklinePosition">Position</label>
+        <select id="sparklinePosition">
+          <option value="below">Below the BAN</option>
+          <option value="right">Right of the BAN</option>
+        </select>
+
+        <h2 class="section">Card style</h2>
+        <label class="field-label" for="cardStyle">Style</label>
+        <select id="cardStyle">
+          <option value="flat">Flat</option>
+          <option value="shadow" selected>Shadow</option>
+          <option value="outlined">Outlined</option>
+        </select>
+        <label class="field-label" for="cornerRadius">Corner radius (px)</label>
+        <input type="number" id="cornerRadius" min="0" max="24" value="8">
+      </div>
+    </div>
+
+    <div class="preview">
+      <h2>Live preview</h2>
+      <div id="previewCards"></div>
+      <div class="preview-note" id="previewNote"></div>
+    </div>
+  </div>
+
+  <div id="error" class="error"></div>
+  <div class="actions-bar">
+    <button class="secondary" id="cancelBtn">Cancel</button>
+    <button class="primary" id="saveBtn" disabled>Save</button>
+  </div>
+</div>
+
+<script>
+  let dashboard;
+  let dashboardParameters = [];
+  let cfg = defaultConfig();
+  let openKpiId = null;       // id of the KPI whose editor is expanded
+  let dragIndex = null;
+  const fieldCache = {};      // worksheet name -> [{fieldName}] (memoized per session)
+  let previewDebounce = null;
+
+  function defaultConfig() {
+    return {
+      title: 'KPI Cards', showTitle: true, showConfigureButton: true,
+      paletteName: (window.TABLEAU_PALETTES && window.TABLEAU_PALETTES.find(p => p.type === 'regular') || {}).name || '',
+      accentMode: 'top',
+      // 'uniform' = every card uses these shared colors, per-KPI color overrides are ignored
+      // (and shown disabled in each KPI's editor); 'individual' = each KPI's own color
+      // settings (below) take effect.
+      colorMode: 'uniform',
+      positiveColor: '#1a8a4a', negativeColor: '#b3261e', showTrendArrow: true, comparisonLabel: 'vs comparison',
+      cardTransparent: false, cardBg: '#ffffff', cardText: '#1a1a1a',
+      fontFamily: "-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif",
+      valueFontSize: 32, labelFontSize: 11, valueFontWeight: '700',
+      autoFitColumns: true, cardMinWidth: 180, cardMinHeight: 0, cardsPerRow: 4, cardGap: 12, cardStyle: 'shadow', cornerRadius: 8,
+      sparklinePosition: 'below',
+      kpis: [],
+    };
+  }
+
+  function newKpi() {
+    return {
+      id: 'k' + Math.random().toString(36).slice(2, 9),
+      worksheet: '', currentField: '',
+      labelMode: 'custom', customLabel: 'New KPI', labelField: '',
+      comparisonMode: 'none', comparisonField: '', comparisonFixed: 0,
+      goodDirection: 'up',
+      // Which date-bucketed rows feed the BAN value (and its comparison) - "latest" is a
+      // single point (the historical default); the rest sum the current-period sparkline's
+      // trend rows (see below), independent of whether the sparkline is visually shown. The
+      // aggregation function itself is never user-overridable (see guessAggFn) - a
+      // calculated ratio field like SUM(Sales)/SUM(Orders) never matches its naming
+      // convention, so it's never summed or averaged, only ever read as "latest".
+      aggregationPeriod: 'latest',
+      // Blank = use Tableau's own formatted prefix (e.g. a currency symbol) as-is.
+      customPrefix: '',
+      useCustomColors: false, positiveColor: '#1a8a4a', negativeColor: '#b3261e',
+      // 'palette' = cycled from the selected palette by card position (default); 'custom' =
+      // accentColor below; 'conditional' = the good/bad color based on this metric's own
+      // performance vs its comparison period (falls back to 'palette' with no comparison).
+      accentColorMode: 'palette', accentColor: '#1e6eb5',
+      supportingMetrics: [],
+      // Current period trend + chart style
+      sparklineEnabled: false, trendWorksheet: '', trendDateField: '', trendValueField: '',
+      sparkShowYAxis: false, sparkShowXAxis: false,
+      curSparkChartType: 'line', curSparkLineStyle: 'solid', curSparkBarStyle: 'filled', curSparkAreaStyle: 'solid',
+      // 'neutral' = curSparkColor below, independent of the BAN's own accent; 'conditional' =
+      // same good/bad-vs-comparison color as accentColorMode's 'conditional' case.
+      curSparkColorMode: 'neutral', curSparkColor: '#1e6eb5',
+      // Comparison period trend + chart style (optional overlay)
+      comparisonSparkEnabled: false, cmpTrendWorksheet: '', cmpTrendDateField: '', cmpTrendValueField: '',
+      cmpSparkChartType: 'line', cmpSparkLineStyle: 'dotted', cmpSparkBarStyle: 'outline', cmpSparkAreaStyle: 'solid',
+      cmpSparkColor: '#b7bec6',
+      tooltipEnabled: false, tooltipTemplate: '',
+      sparkTooltipEnabled: false, sparkTooltipTemplate: '',
+      captionEnabled: false, captionTemplate: '',
+      filterEnabled: false, filterWorksheets: [], filterField: '', filterValueField: '',
+      parameterEnabled: false, parameterName: '', parameterValueSource: 'label', parameterFixedValue: '',
+    };
+  }
+
+  function showError(msg) { document.getElementById('error').textContent = msg || ''; }
+  function escapeHtml(str) {
+    const d = document.createElement('div');
+    d.textContent = str == null ? '' : String(str);
+    return d.innerHTML;
+  }
+  // Mirrors index.html's own copy - substitutes each <span data-tt-field> chip (caption/
+  // tooltip rich-text editors) with its live formatted value, for the live preview.
+  function substituteTooltipChips(html, fieldsMap) {
+    return html.replace(/<span[^>]*data-tt-field="([^"]+)"[^>]*>.*?<\/span>/g, (m, field) => {
+      return escapeHtml(fieldsMap[field] == null ? '' : fieldsMap[field]);
+    });
+  }
+  function findKpi(id) { return cfg.kpis.find(k => k.id === id); }
+
+  // ---------- Tabs ----------
+  document.querySelectorAll('.tabbtn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.tabbtn').forEach(b => b.classList.remove('active'));
+      document.querySelectorAll('.tabpane').forEach(p => p.classList.remove('active'));
+      btn.classList.add('active');
+      document.getElementById('tab-' + btn.getAttribute('data-tab')).classList.add('active');
+    });
+  });
+
+  // ---------- Palette list (global accent palette) ----------
+  function renderPaletteList(filter) {
+    const list = document.getElementById('paletteList');
+    const q = (filter || '').toLowerCase();
+    const palettes = (window.TABLEAU_PALETTES || []).filter(p => p.name.toLowerCase().includes(q));
+    list.innerHTML = palettes.map(p => {
+      const dots = p.colors.slice(0, 8).map(c => '<span class="swatch" style="background:' + c + '"></span>').join('');
+      const sel = p.name === cfg.paletteName ? ' selected' : '';
+      return '<div class="palette-row' + sel + '" data-name="' + escapeHtml(p.name) + '">' +
+        '<span class="swatches">' + dots + '</span>' +
+        '<span class="pname">' + escapeHtml(p.name) + '</span>' +
+        '<span class="ptype">' + p.type.replace('ordered-', '') + '</span>' +
+        '</div>';
+    }).join('') || '<div class="palette-row"><span class="pname">No palettes match.</span></div>';
+    document.getElementById('paletteSelectedName').textContent = cfg.paletteName || '(none)';
+  }
+  document.getElementById('paletteSearch').addEventListener('input', e => renderPaletteList(e.target.value));
+  document.getElementById('paletteList').addEventListener('click', e => {
+    const row = e.target.closest('.palette-row');
+    if (!row || !row.getAttribute('data-name')) return;
+    cfg.paletteName = row.getAttribute('data-name');
+    renderPaletteList(document.getElementById('paletteSearch').value);
+    refreshAllColorSwatches();
+    schedulePreview();
+    validate();
+  });
+
+  // ---------- Palette quick-pick swatches (every color field, sourced from the selected accent palette) ----------
+  function paletteSwatchColors() {
+    return currentPalette().colors.slice(0, 12);
+  }
+
+  function colorInputForSwatchContainer(el) {
+    const targetId = el.getAttribute('data-target');
+    if (targetId) return document.getElementById(targetId);
+    const targetF = el.getAttribute('data-color-f');
+    if (targetF) {
+      const scope = el.closest('.kpi-editor') || document;
+      return scope.querySelector('[data-f="' + targetF + '"]');
+    }
+    return null;
+  }
+
+  function renderColorSwatchStrip(el) {
+    const input = colorInputForSwatchContainer(el);
+    const current = (input && input.value || '').toLowerCase();
+    el.innerHTML = paletteSwatchColors().map(c =>
+      '<button type="button" class="swatch-pick' + (c.toLowerCase() === current ? ' selected' : '') + '" data-color="' + c + '" style="background:' + c + '" title="' + c + '"></button>'
+    ).join('');
+  }
+
+  function refreshAllColorSwatches() {
+    document.querySelectorAll('.color-swatches').forEach(renderColorSwatchStrip);
+  }
+
+  function syncSwatchSelectionForInput(inputEl) {
+    if (!inputEl || inputEl.type !== 'color') return;
+    let container = null;
+    if (inputEl.id) container = document.querySelector('.color-swatches[data-target="' + inputEl.id + '"]');
+    const f = inputEl.getAttribute('data-f');
+    if (!container && f) {
+      const scope = inputEl.closest('.kpi-editor') || document;
+      container = scope.querySelector('.color-swatches[data-color-f="' + f + '"]');
+    }
+    if (container) renderColorSwatchStrip(container);
+  }
+
+  document.addEventListener('click', e => {
+    const sw = e.target.closest('.swatch-pick');
+    if (!sw) return;
+    const container = sw.closest('.color-swatches');
+    const input = container && colorInputForSwatchContainer(container);
+    if (!input) return;
+    input.value = sw.getAttribute('data-color');
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+    renderColorSwatchStrip(container);
+  });
+
+  // ---------- Sparkline chart builder (bar/line/area, current + comparison overlay) ----------
+  function sparkDashArray(style) {
+    if (style === 'dotted') return '1.5,3.5';
+    if (style === 'broken') return '6,3';
+    return null;
+  }
+
+  function sparkLinePath(points, style) {
+    if (!points.length) return '';
+    if (style === 'stepped') {
+      let d = 'M' + points[0].x.toFixed(1) + ',' + points[0].y.toFixed(1);
+      for (let i = 1; i < points.length; i++) {
+        d += ' L' + points[i].x.toFixed(1) + ',' + points[i - 1].y.toFixed(1);
+        d += ' L' + points[i].x.toFixed(1) + ',' + points[i].y.toFixed(1);
+      }
+      return d;
+    }
+    return 'M' + points.map(p => p.x.toFixed(1) + ',' + p.y.toFixed(1)).join(' L');
+  }
+
+  function sparkAreaPath(points, h) {
+    if (!points.length) return '';
+    let d = 'M' + points[0].x.toFixed(1) + ',' + h;
+    points.forEach(p => { d += ' L' + p.x.toFixed(1) + ',' + p.y.toFixed(1); });
+    d += ' L' + points[points.length - 1].x.toFixed(1) + ',' + h + ' Z';
+    return d;
+  }
+
+  function sparkScalePoints(trend, minV, maxV, w, h) {
+    const range = (maxV - minV) || 1;
+    return trend.map((t, i) => ({
+      x: trend.length > 1 ? (i / (trend.length - 1)) * w : w / 2,
+      y: h - ((t.value - minV) / range) * h,
+    }));
+  }
+
+  function sparkBarRects(points, style, color, offset, barWidth, h) {
+    return points.map(p => {
+      const barH = Math.max(0, h - p.y);
+      const x = p.x + offset - barWidth / 2;
+      const fill = style === 'outline' ? 'none' : color;
+      const stroke = style === 'outline' ? color : 'none';
+      return '<rect x="' + x.toFixed(1) + '" y="' + p.y.toFixed(1) + '" width="' + barWidth.toFixed(1) +
+        '" height="' + barH.toFixed(1) + '" fill="' + fill + '" stroke="' + stroke + '" stroke-width="' + (style === 'outline' ? 1.3 : 0) + '"/>';
+    }).join('');
+  }
+
+  function sparkSeriesSVG(points, chartType, lineStyle, barStyle, areaStyle, color, h, barOffset, barWidth, gradId) {
+    if (chartType === 'bar') {
+      return { html: sparkBarRects(points, barStyle, color, barOffset || 0, barWidth, h), defs: '' };
+    }
+    if (chartType === 'area') {
+      const path = sparkAreaPath(points, h);
+      let defs = '', fill, fillOpacity = '0.25', strokeWidth = 2;
+      if (areaStyle === 'faded') {
+        defs = '<linearGradient id="' + gradId + '" x1="0" y1="0" x2="0" y2="1">' +
+          '<stop offset="0%" stop-color="' + color + '" stop-opacity="0.4"/>' +
+          '<stop offset="100%" stop-color="' + color + '" stop-opacity="0"/>' +
+          '</linearGradient>';
+        fill = 'url(#' + gradId + ')';
+        fillOpacity = '1';
+        strokeWidth = 2.5;
+      } else {
+        fill = color;
+      }
+      const html = '<path d="' + path + '" fill="' + fill + '" fill-opacity="' + fillOpacity + '" stroke="none"/>' +
+        '<path d="' + sparkLinePath(points, 'solid') + '" fill="none" stroke="' + color + '" stroke-width="' + strokeWidth + '" stroke-linejoin="round" stroke-linecap="round"/>';
+      return { html, defs };
+    }
+    const dash = sparkDashArray(lineStyle);
+    const html = '<path d="' + sparkLinePath(points, lineStyle) + '" fill="none" stroke="' + color + '" stroke-width="2" ' +
+      (dash ? 'stroke-dasharray="' + dash + '" ' : '') + 'stroke-linejoin="round" stroke-linecap="round"/>';
+    return { html, defs: '' };
+  }
+
+  function buildSparklineSVG(kpi, currentTrend, comparisonTrend, accentColor, withHitCircles) {
+    const w = 100, h = 28;
+    const curOn = kpi.sparklineEnabled && currentTrend && currentTrend.length > 1;
+    const cmpOn = kpi.comparisonSparkEnabled && comparisonTrend && comparisonTrend.length > 1;
+    if (!curOn && !cmpOn) return '';
+
+    const allVals = [].concat(curOn ? currentTrend.map(t => t.value) : []).concat(cmpOn ? comparisonTrend.map(t => t.value) : []);
+    const minV = Math.min(...allVals), maxV = Math.max(...allVals);
+
+    const curPts = curOn ? sparkScalePoints(currentTrend, minV, maxV, w, h) : [];
+    const cmpPts = cmpOn ? sparkScalePoints(comparisonTrend, minV, maxV, w, h) : [];
+    const cmpColor = kpi.cmpSparkColor || '#b7bec6';
+    const uid = 'g' + Math.random().toString(36).slice(2, 8);
+
+    let body = '', defs = '';
+    const bothBars = curOn && cmpOn && kpi.curSparkChartType === 'bar' && kpi.cmpSparkChartType === 'bar';
+
+    if (bothBars) {
+      const slot = w / Math.max(curPts.length, cmpPts.length, 1);
+      const bw = slot * 0.32;
+      const cmpRes = sparkSeriesSVG(cmpPts, 'bar', null, kpi.cmpSparkBarStyle, null, cmpColor, h, -bw * 0.55, bw, uid + 'c');
+      const curRes = sparkSeriesSVG(curPts, 'bar', null, kpi.curSparkBarStyle, null, accentColor, h, bw * 0.55, bw, uid + 'u');
+      body += cmpRes.html + curRes.html;
+      defs += cmpRes.defs + curRes.defs;
+    } else {
+      if (cmpOn) {
+        const slot = w / Math.max(cmpPts.length, 1);
+        const res = sparkSeriesSVG(cmpPts, kpi.cmpSparkChartType, kpi.cmpSparkLineStyle, kpi.cmpSparkBarStyle, kpi.cmpSparkAreaStyle, cmpColor, h, 0, slot * 0.6, uid + 'c');
+        body += res.html; defs += res.defs;
+      }
+      if (curOn) {
+        const slot = w / Math.max(curPts.length, 1);
+        const res = sparkSeriesSVG(curPts, kpi.curSparkChartType, kpi.curSparkLineStyle, kpi.curSparkBarStyle, kpi.curSparkAreaStyle, accentColor, h, 0, slot * 0.6, uid + 'u');
+        body += res.html; defs += res.defs;
+      }
+    }
+
+    let dots = '';
+    if (withHitCircles) {
+      if (curOn) dots += curPts.map((p, i) => '<circle class="hit" cx="' + p.x.toFixed(1) + '" cy="' + p.y.toFixed(1) + '" r="5" fill="transparent" data-kpi-id="' + kpi.id + '" data-series="current" data-point-index="' + i + '"></circle>').join('');
+      if (cmpOn) dots += cmpPts.map((p, i) => '<circle class="hit" cx="' + p.x.toFixed(1) + '" cy="' + p.y.toFixed(1) + '" r="5" fill="transparent" data-kpi-id="' + kpi.id + '" data-series="comparison" data-point-index="' + i + '"></circle>').join('');
+    }
+
+    return '<svg class="k-spark" viewBox="0 0 ' + w + ' ' + h + '" preserveAspectRatio="none">' +
+      (defs ? '<defs>' + defs + '</defs>' : '') + body + dots + '</svg>';
+  }
+
+  // Compact display format for a Y-axis min/max label - not a replica of Tableau's own
+  // number formatting (see formatMetricValue for that), just a legible approximation since
+  // a sparkline's plotted values don't carry a formatted-string sample to match.
+  function formatAxisValue(value) {
+    return new Intl.NumberFormat(undefined, { notation: 'compact', maximumFractionDigits: 1 }).format(value);
+  }
+
+  // Mirrors buildSparklineSVG's own curOn/cmpOn gating so the labels reflect exactly what
+  // was actually plotted. X-axis dates are read from each trend's own fieldsMap (the date
+  // field's real Tableau-formatted string) when available (live preview); the sample-data
+  // fallback trends don't have one, so those degrade to blank labels rather than erroring.
+  function buildAxisLabelsHtml(kpi, currentTrend, comparisonTrend) {
+    if (!kpi.sparkShowYAxis && !kpi.sparkShowXAxis) return { y: '', x: '' };
+    const curOn = kpi.sparklineEnabled && currentTrend && currentTrend.length > 1;
+    const cmpOn = kpi.comparisonSparkEnabled && comparisonTrend && comparisonTrend.length > 1;
+    let y = '', x = '';
+    if (kpi.sparkShowYAxis) {
+      const allVals = [].concat(curOn ? currentTrend.map(t => t.value) : []).concat(cmpOn ? comparisonTrend.map(t => t.value) : []);
+      if (allVals.length) {
+        y = '<div class="k-axis-y"><span>' + escapeHtml(formatAxisValue(Math.max(...allVals))) + '</span><span>' + escapeHtml(formatAxisValue(Math.min(...allVals))) + '</span></div>';
+      }
+    }
+    if (kpi.sparkShowXAxis) {
+      const dateTrend = curOn ? currentTrend : (cmpOn ? comparisonTrend : null);
+      const dateField = curOn ? kpi.trendDateField : kpi.cmpTrendDateField;
+      if (dateTrend && dateTrend.length > 1) {
+        const first = (dateTrend[0].fieldsMap && dateTrend[0].fieldsMap[dateField]) || '';
+        const last = (dateTrend[dateTrend.length - 1].fieldsMap && dateTrend[dateTrend.length - 1].fieldsMap[dateField]) || '';
+        x = '<div class="k-axis-x"><span>' + escapeHtml(first) + '</span><span>' + escapeHtml(last) + '</span></div>';
+      }
+    }
+    return { y, x };
+  }
+
+  // ---------- Card rendering (mirrors index.html) ----------
+  function currentPalette() {
+    return (window.TABLEAU_PALETTES || []).find(p => p.name === cfg.paletteName) || { colors: ['#1e6eb5'] };
+  }
+
+  function cardColors(kpi) {
+    if (cfg.colorMode === 'individual' && kpi.useCustomColors) return { pos: kpi.positiveColor, neg: kpi.negativeColor };
+    return { pos: cfg.positiveColor, neg: cfg.negativeColor };
+  }
+
+  function buildCardHTML(kpi, colorIdx, data) {
+    const palette = currentPalette();
+    const radius = cfg.cornerRadius + 'px';
+    let boxShadow = 'none', border = 'none';
+    if (cfg.cardStyle === 'shadow') boxShadow = '0 1px 3px rgba(0,0,0,.12), 0 1px 2px rgba(0,0,0,.08)';
+    if (cfg.cardStyle === 'outlined') border = '1px solid #e2e5e9';
+    const bg = cfg.cardTransparent ? 'transparent' : cfg.cardBg;
+    const colors = cardColors(kpi);
+    const minHeightStyle = cfg.cardMinHeight ? ';min-height:' + cfg.cardMinHeight + 'px' : '';
+
+    let hasComparison = false, isGood = true, pct = 0;
+    if (kpi.comparisonMode !== 'none' && data.comparison != null && !Number.isNaN(data.comparison)) {
+      hasComparison = true;
+      pct = data.comparison !== 0 ? ((data.value - data.comparison) / Math.abs(data.comparison)) * 100 : 0;
+      const risingIsGood = kpi.goodDirection !== 'down';
+      isGood = risingIsGood ? pct >= 0 : pct <= 0;
+    }
+
+    const paletteAccent = palette.colors[colorIdx % palette.colors.length];
+    const accentColorMode = cfg.colorMode === 'individual' ? kpi.accentColorMode : 'palette';
+    let accent = paletteAccent;
+    if (accentColorMode === 'custom') accent = kpi.accentColor;
+    else if (accentColorMode === 'conditional') accent = hasComparison ? (isGood ? colors.pos : colors.neg) : paletteAccent;
+
+    const curSparkColorMode = cfg.colorMode === 'individual' ? kpi.curSparkColorMode : 'neutral';
+    const curSparkColor = curSparkColorMode === 'conditional' ? (hasComparison ? (isGood ? colors.pos : colors.neg) : kpi.curSparkColor) : kpi.curSparkColor;
+
+    let deltaHtml = '';
+    if (hasComparison) {
+      const arrow = cfg.showTrendArrow ? (pct >= 0 ? '▲' : '▼') + ' ' : '';
+      const color = isGood ? colors.pos : colors.neg;
+      const labelSuffix = cfg.comparisonLabel ? ' ' + escapeHtml(cfg.comparisonLabel) : '';
+      deltaHtml = '<div class="k-delta" style="color:' + color + '">' + arrow + Math.abs(pct).toFixed(1) + '%' + labelSuffix + '</div>';
+    }
+
+    let supportHtml = '';
+    if (kpi.supportingMetrics && kpi.supportingMetrics.length && data.supportingValues) {
+      supportHtml = kpi.supportingMetrics.map(sm => {
+        const v = data.supportingValues[sm.field];
+        if (v == null) return '';
+        return '<div class="k-support">' + escapeHtml(sm.label || sm.field) + ': ' + escapeHtml(v) + '</div>';
+      }).join('');
+    }
+
+    const sparkHtml = buildSparklineSVG(kpi, data.trend, data.comparisonTrend, curSparkColor, false);
+    const axisLabels = sparkHtml ? buildAxisLabelsHtml(kpi, data.trend, data.comparisonTrend) : { y: '', x: '' };
+
+    const accentBar = cfg.accentMode === 'top' ? '<div class="accent-top" style="background:' + accent + '"></div>'
+      : cfg.accentMode === 'left' ? '<div class="accent-left" style="background:' + accent + '"></div>' : '';
+    const valueColor = cfg.accentMode === 'value' ? accent : cfg.cardText;
+
+    const rightLayout = cfg.sparklinePosition === 'right';
+    const mainHtml = '<div class="k-main">' +
+      '<div class="k-label" style="font-size:' + cfg.labelFontSize + 'px">' + escapeHtml(data.label) + '</div>' +
+      '<div class="k-value" style="font-size:' + cfg.valueFontSize + 'px;font-weight:' + cfg.valueFontWeight + ';color:' + valueColor + '">' + escapeHtml(data.formattedValue) + '</div>' +
+      deltaHtml + supportHtml +
+      '</div>';
+    const sparkWrapped = sparkHtml
+      ? '<div class="k-spark-wrap' + (rightLayout ? ' right' : ' below') + '"><div class="k-spark-inner"><div class="k-spark-row">' + axisLabels.y + sparkHtml + '</div>' + axisLabels.x + '</div></div>'
+      : '';
+
+    const captionHtml = kpi.captionEnabled && kpi.captionTemplate
+      ? '<div class="k-caption">' + substituteTooltipChips(kpi.captionTemplate, data.tooltipFieldsMap || {}) + '</div>'
+      : '';
+
+    return '<div class="kpi-card" style="background:' + bg + ';border-radius:' + radius + ';box-shadow:' + boxShadow +
+      ';border:' + border + ';color:' + cfg.cardText + ';font-family:' + cfg.fontFamily + minHeightStyle + '">' +
+      accentBar +
+      '<div class="k-body ' + (rightLayout ? 'right' : 'below') + '">' + mainHtml + sparkWrapped + '</div>' +
+      captionHtml +
+      '</div>';
+  }
+
+  function sampleData(kpi) {
+    const curTrend = [3, 4, 3.5, 5, 4.8, 6, 7, 6.5, 7.2, 8].map((v, i) => ({ date: i, value: v }));
+    const cmpTrend = [2.6, 3.2, 3.6, 3.9, 4.2, 4.6, 5, 5.3, 5.6, 5.9].map((v, i) => ({ date: i, value: v }));
+    return {
+      label: kpi.labelMode === 'custom' ? (kpi.customLabel || 'New KPI') : (kpi.labelField || 'Label field'),
+      value: 128400, formattedValue: '$128.4K', comparison: 120000,
+      supportingValues: Object.fromEntries((kpi.supportingMetrics || []).map(sm => [sm.field, '42'])),
+      trend: curTrend, comparisonTrend: cmpTrend,
+      tooltipFieldsMap: {},
+    };
+  }
+
+  // ---------- Field lookups ----------
+  // ---------- Measure Names/Measure Values support ----------
+  // A worksheet built with the "Measure Values" shelf (multiple measures dropped in,
+  // "Measure Names" as the identifying dimension) returns one ROW per measure - "Measure
+  // Names" holds which measure (e.g. "SUM(Sales)") and "Measure Values" holds its number -
+  // instead of one column per measure. Every downstream reader in this file expects the
+  // wide shape (one column per measure), so this pivots long -> wide right at the read
+  // boundary: each distinct Measure Names value becomes its own synthetic column, grouped
+  // by whatever other columns are present (e.g. a Date field), so nothing downstream needs
+  // to know which shape the worksheet was actually built in.
+  function pivotMeasureNames(table) {
+    const mnIdx = table.columns.findIndex(c => c.fieldName === 'Measure Names');
+    const mvIdx = table.columns.findIndex(c => c.fieldName === 'Measure Values');
+    if (mnIdx === -1 || mvIdx === -1) return table;
+
+    const otherIdxs = table.columns.map((_, i) => i).filter(i => i !== mnIdx && i !== mvIdx);
+    const otherCols = otherIdxs.map(i => table.columns[i]);
+
+    const measureNames = [];
+    const seenNames = new Set();
+    const groups = new Map();
+    const order = [];
+    table.data.forEach(row => {
+      const name = row[mnIdx].formattedValue || String(row[mnIdx].value);
+      if (!seenNames.has(name)) { seenNames.add(name); measureNames.push(name); }
+      const key = otherIdxs.map(i => String(row[i].value)).join('');
+      if (!groups.has(key)) { groups.set(key, { otherValues: otherIdxs.map(i => row[i]), measures: {} }); order.push(key); }
+      groups.get(key).measures[name] = row[mvIdx];
+    });
+
+    const columns = otherCols.concat(measureNames.map(name => ({ fieldName: name })));
+    const data = order.map(key => {
+      const g = groups.get(key);
+      return g.otherValues.concat(measureNames.map(name => g.measures[name] || { value: null, formattedValue: '' }));
+    });
+
+    return Object.assign({}, table, { columns, data });
+  }
+
+  async function fieldsFor(wsName) {
+    if (!wsName) return [];
+    if (fieldCache[wsName]) return fieldCache[wsName];
+    const ws = dashboard.worksheets.find(w => w.name === wsName);
+    if (!ws) return [];
+    try {
+      // No maxRows cap here (unlike a plain field lookup) - a Measure Values worksheet
+      // needs every row read to discover the full set of distinct measure names.
+      const table = pivotMeasureNames(await ws.getSummaryDataAsync({ ignoreSelection: true }));
+      const fields = table.columns.map(c => ({ fieldName: c.fieldName }));
+      fieldCache[wsName] = fields;
+      return fields;
+    } catch (e) {
+      return [];
+    }
+  }
+
+  async function firstRowFor(wsName) {
+    const ws = dashboard.worksheets.find(w => w.name === wsName);
+    if (!ws) return null;
+    try {
+      const table = pivotMeasureNames(await ws.getSummaryDataAsync({ ignoreSelection: true }));
+      if (!table.data.length) return null;
+      const row = {};
+      table.columns.forEach((c, i) => { row[c.fieldName] = table.data[0][i]; });
+      return row;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  async function allRowsFor(wsName) {
+    const ws = dashboard.worksheets.find(w => w.name === wsName);
+    if (!ws) return [];
+    try {
+      const table = pivotMeasureNames(await ws.getSummaryDataAsync({ ignoreSelection: true }));
+      return table.data.map(row => {
+        const r = {};
+        table.columns.forEach((c, i) => { r[c.fieldName] = row[i]; });
+        return r;
+      });
+    } catch (e) {
+      return [];
+    }
+  }
+
+  function buildTrendFromRows(rows, dateField, valueField) {
+    return rows
+      .filter(r => r[valueField] != null && r[dateField] != null)
+      .map(r => {
+        const fieldsMap = {};
+        Object.keys(r).forEach(fieldName => { fieldsMap[fieldName] = r[fieldName].formattedValue; });
+        return { date: r[dateField].value, value: Number(r[valueField].value), formattedValue: r[valueField].formattedValue, fieldsMap };
+      })
+      .filter(p => !Number.isNaN(p.value))
+      .sort((a, b) => {
+        if (a.date instanceof Date && b.date instanceof Date) return a.date - b.date;
+        return String(a.date).localeCompare(String(b.date));
+      });
+  }
+
+  // ---------- BAN aggregation period ----------
+  // Which rows (by date) feed the BAN's big number and its comparison value. "latest" is a
+  // single point; the rest sum every date-bucketed row falling in the window - the last N
+  // buckets for last3/6/12, or the calendar period containing the most recent date present
+  // in that series (not today's real date, since a worksheet's data is very often not
+  // current through today) for qtd/mtd/ytd. Each series (current vs. comparison) is
+  // aggregated independently, anchored on its own latest date - so a comparison series
+  // dated a year earlier still gets its own correct "that year's YTD", not zero rows from
+  // being compared against the current series' year boundary.
+  function pointsInWindow(points, period) {
+    if (!points.length) return [];
+    if (period === 'latest') return [points[points.length - 1]];
+
+    const lastN = { last3: 3, last6: 6, last12: 12 }[period];
+    if (lastN) return points.slice(-lastN);
+
+    const anchorDate = points[points.length - 1].date;
+    if (!(anchorDate instanceof Date)) return [points[points.length - 1]];
+
+    let periodStart;
+    if (period === 'mtd') periodStart = new Date(anchorDate.getFullYear(), anchorDate.getMonth(), 1);
+    else if (period === 'qtd') periodStart = new Date(anchorDate.getFullYear(), Math.floor(anchorDate.getMonth() / 3) * 3, 1);
+    else periodStart = new Date(anchorDate.getFullYear(), 0, 1); // ytd
+
+    return points.filter(p => p.date instanceof Date && p.date >= periodStart && p.date <= anchorDate);
+  }
+
+  // Combines whichever points fall in the window using aggFn ('sum'/'avg'/'min'/'max' -
+  // see guessAggFn). Which function is actually correct depends on the field: summing an
+  // average, or a table calculation like WINDOW_SUM/RUNNING_SUM/RANK that's already
+  // computed relative to the current view, produces a number with no real meaning - the
+  // Extensions API doesn't expose enough field metadata for a worksheet read this way to
+  // detect that automatically, so it's always inferred from the field's own name
+  // (guessAggFn) rather than user-overridable - a calculated ratio field like
+  // SUM(Sales)/SUM(Orders) never matches that naming convention, so it's never summed or
+  // averaged here, and always reads as "latest" instead.
+  function aggregateByPeriod(points, period, aggFn) {
+    if (!points.length) return NaN;
+    if (!aggFn) return points[points.length - 1].value;
+    const window = pointsInWindow(points, period);
+    if (!window.length) return NaN;
+    const values = window.map(p => p.value);
+    if (aggFn === 'avg') return values.reduce((sum, v) => sum + v, 0) / values.length;
+    if (aggFn === 'min') return Math.min(...values);
+    if (aggFn === 'max') return Math.max(...values);
+    return values.reduce((sum, v) => sum + v, 0); // sum
+  }
+
+  // The sole (non-overridable) source of which function is safe to combine a field's values
+  // with - inferred from its own name (Tableau's summary-data column names are typically
+  // "SUM(Sales)", "AVG(Rating)", etc.). Table calculations and calculated fields (including
+  // ratio/AGG() calcs like SUM(Sales)/SUM(Orders)) don't follow this convention and
+  // correctly fall through to null - the caller then always reads "latest" for them.
+  function guessAggFn(fieldName) {
+    const name = String(fieldName || '');
+    if (/^(SUM|CNT|COUNT|CNTD|COUNTD)\(/i.test(name)) return 'sum';
+    if (/^(AVG|AVERAGE|MEDIAN)\(/i.test(name)) return 'avg';
+    if (/^MIN\(/i.test(name)) return 'min';
+    if (/^MAX\(/i.test(name)) return 'max';
+    return null;
+  }
+
+  const VALUE_ABBREVIATIONS = [
+    { threshold: 1e12, letter: 'T' },
+    { threshold: 1e9, letter: 'B' },
+    { threshold: 1e6, letter: 'M' },
+    { threshold: 1e3, letter: 'K' },
+  ];
+
+  // Formats a value (the plain "latest" reading, or a summed/averaged one) to match the
+  // style of a single already-formatted sample (e.g. "$128.40", "12.3%", "$10,000") -
+  // detects a currency/text prefix, a percent suffix, and the native decimal precision, and
+  // reproduces them around the new number. Abbreviation is decided fresh from rawValue's own
+  // magnitude (>= 1 trillion/billion/million/thousand -> T/B/M/K), not copied from the
+  // sample, so a value under 1,000 always shows the field's plain native format. customPrefix,
+  // when non-empty, replaces the auto-detected prefix outright. A heuristic, not a full
+  // replica of Tableau's number-formatting engine.
+  function formatMetricValue(rawValue, sampleFormatted, customPrefix) {
+    const match = String(sampleFormatted || '').match(/^([^\d-]*)([\d.,-]+)\s*[KMBT]?\s*(%?)$/i);
+    if (!match) return (customPrefix || '') + String(rawValue);
+    const autoPrefix = match[1], digits = match[2], pctSuffix = match[3];
+    const prefix = customPrefix || autoPrefix;
+    const decimalMatch = digits.match(/\.(\d+)$/);
+    const sampleDecimals = decimalMatch ? decimalMatch[1].length : 0;
+
+    if (pctSuffix) {
+      const scaled = rawValue * 100;
+      const numStr = scaled.toLocaleString(undefined, { minimumFractionDigits: sampleDecimals, maximumFractionDigits: sampleDecimals });
+      return prefix + numStr + pctSuffix;
+    }
+
+    const abbrev = VALUE_ABBREVIATIONS.find(a => Math.abs(rawValue) >= a.threshold);
+    const scaled = abbrev ? rawValue / abbrev.threshold : rawValue;
+    const decimals = abbrev ? Math.max(sampleDecimals, 1) : sampleDecimals;
+    const numStr = scaled.toLocaleString(undefined, { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
+    return prefix + numStr + (abbrev ? abbrev.letter : '');
+  }
+
+  function fillSelect(el, options, includeNone, current) {
+    el.innerHTML = (includeNone ? '<option value="">- None -</option>' : '') +
+      options.map(o => '<option value="' + escapeHtml(o.fieldName) + '">' + escapeHtml(o.fieldName) + '</option>').join('');
+    if (current && options.some(o => o.fieldName === current)) el.value = current;
+  }
+
+  // ---------- Live preview (real data for the open card, sample otherwise) ----------
+  function schedulePreview() {
+    clearTimeout(previewDebounce);
+    previewDebounce = setTimeout(renderPreview, 250);
+  }
+
+  async function renderPreview() {
+    document.getElementById('titlePreviewText').textContent = (cfg.title || 'KPI Cards') + ' - Configure';
+    const kpis = cfg.kpis.length ? cfg.kpis.slice(0, 3) : [];
+    if (!kpis.length) {
+      document.getElementById('previewCards').innerHTML = '';
+      document.getElementById('previewNote').textContent = 'Add a KPI to see a preview.';
+      return;
+    }
+    const note = document.getElementById('previewNote');
+    note.textContent = 'Live where possible, otherwise sample data. Sparkline shapes are illustrative in this preview; real series render live on the dashboard.';
+    const htmls = [];
+    for (let i = 0; i < kpis.length; i++) {
+      const kpi = kpis[i];
+      let data = null;
+      if (kpi.worksheet && kpi.currentField) {
+        try { data = await liveDataFor(kpi); } catch (e) { data = null; }
+      }
+      htmls.push(buildCardHTML(kpi, i, data || sampleData(kpi)));
+    }
+    const previewEl = document.getElementById('previewCards');
+    previewEl.innerHTML = htmls.join('');
+    equalizeCardHeights(previewEl);
+  }
+
+  // Mirrors index.html's own equalizeCardHeights - cards should always share one height,
+  // sized to the tallest one.
+  function equalizeCardHeights(container) {
+    const cardEls = container.querySelectorAll('.kpi-card');
+    if (!cardEls.length) return;
+    let max = cfg.cardMinHeight || 0;
+    cardEls.forEach(el => { el.style.height = ''; max = Math.max(max, el.scrollHeight); });
+    cardEls.forEach(el => { el.style.height = max + 'px'; });
+  }
+
+  async function liveDataFor(kpi) {
+    const row = await firstRowFor(kpi.worksheet);
+    if (!row || !row[kpi.currentField]) return null;
+    const label = kpi.labelMode === 'custom' ? (kpi.customLabel || '') : (row[kpi.labelField] ? row[kpi.labelField].formattedValue : '');
+    const supportingValues = {};
+    (kpi.supportingMetrics || []).forEach(sm => {
+      if (row[sm.field]) supportingValues[sm.field] = row[sm.field].formattedValue;
+    });
+    const tooltipFieldsMap = {};
+    Object.keys(row).forEach(fieldName => { tooltipFieldsMap[fieldName] = row[fieldName].formattedValue; });
+
+    // Trend data is fetched for real (not just illustrative) whenever it's needed either
+    // to draw the sparkline or to compute an aggregated BAN value - those are independent
+    // toggles, since aggregation period doesn't require the sparkline to actually be shown.
+    const needsCurTrend = (kpi.sparklineEnabled || kpi.aggregationPeriod !== 'latest') && kpi.trendWorksheet && kpi.trendDateField && kpi.trendValueField;
+    let trend = [];
+    if (needsCurTrend) {
+      const trendRows = await allRowsFor(kpi.trendWorksheet);
+      trend = buildTrendFromRows(trendRows, kpi.trendDateField, kpi.trendValueField);
+    }
+
+    const needsCmpTrend = (kpi.comparisonSparkEnabled || (kpi.aggregationPeriod !== 'latest' && kpi.comparisonMode === 'field')) &&
+      kpi.cmpTrendWorksheet && kpi.cmpTrendDateField && kpi.cmpTrendValueField;
+    let comparisonTrend = [];
+    if (needsCmpTrend) {
+      const cmpRows = await allRowsFor(kpi.cmpTrendWorksheet);
+      comparisonTrend = buildTrendFromRows(cmpRows, kpi.cmpTrendDateField, kpi.cmpTrendValueField);
+    }
+
+    let value = Number(row[kpi.currentField].value);
+    if (kpi.aggregationPeriod !== 'latest' && trend.length) {
+      const agg = aggregateByPeriod(trend, kpi.aggregationPeriod, guessAggFn(kpi.currentField));
+      if (!Number.isNaN(agg)) value = agg;
+    }
+    const formattedValue = formatMetricValue(value, row[kpi.currentField].formattedValue, kpi.customPrefix);
+
+    let comparison = null;
+    if (kpi.comparisonMode === 'fixed') comparison = Number(kpi.comparisonFixed);
+    else if (kpi.comparisonMode === 'field' && row[kpi.comparisonField]) comparison = Number(row[kpi.comparisonField].value);
+    if (kpi.comparisonMode === 'field' && kpi.aggregationPeriod !== 'latest' && comparisonTrend.length) {
+      const aggCmp = aggregateByPeriod(comparisonTrend, kpi.aggregationPeriod, guessAggFn(kpi.comparisonField));
+      if (!Number.isNaN(aggCmp)) comparison = aggCmp;
+    }
+
+    return { label, value, formattedValue, comparison, supportingValues, trend, comparisonTrend, tooltipFieldsMap };
+  }
+
+  // ---------- KPI list rendering (accordion) ----------
+  function kpiSummaryLabel(kpi) {
+    return kpi.labelMode === 'custom' ? (kpi.customLabel || '(untitled)') : (kpi.labelField || '(no label field)');
+  }
+
+  function renderKpiList() {
+    const list = document.getElementById('kpiList');
+    if (!cfg.kpis.length) {
+      list.innerHTML = '<div class="kpi-row" style="cursor:default;"><span class="hint">No KPIs yet. Click "+ Add KPI" above.</span></div>';
+      validate();
+      return;
+    }
+    list.innerHTML = cfg.kpis.map((kpi, i) => {
+      let html = '<div class="kpi-row" data-index="' + i + '" data-id="' + kpi.id + '">' +
+        '<span class="drag-handle" title="Drag to reorder">&#8942;&#8942;</span>' +
+        '<span class="kpi-name">' + escapeHtml(kpiSummaryLabel(kpi)) + '<span class="kpi-sub">' +
+        (kpi.worksheet ? escapeHtml(kpi.worksheet) : 'no worksheet set') + '</span></span>' +
+        '<button type="button" data-action="edit" data-id="' + kpi.id + '">' + (openKpiId === kpi.id ? 'Close' : 'Edit') + '</button>' +
+        '<button type="button" class="remove" data-action="remove" data-id="' + kpi.id + '">Remove</button>' +
+        '</div>';
+      if (openKpiId === kpi.id) html += renderKpiEditor(kpi);
+      return html;
+    }).join('');
+    if (openKpiId) wireEditorForOpenKpi();
+    validate();
+  }
+
+  function chartTypeControlsHtml(prefix) {
+    // prefix: 'cur' or 'cmp' -> data-f="curSparkChartType" etc.
+    return '<label class="field-label">Chart type</label>' +
+      '<select data-f="' + prefix + 'SparkChartType"><option value="line">Line</option><option value="bar">Bar</option><option value="area">Area</option></select>' +
+      '<div data-show-if="' + prefix + 'SparkChartType:line">' +
+      '<label class="field-label">Line style</label>' +
+      '<select data-f="' + prefix + 'SparkLineStyle"><option value="solid">Solid</option><option value="dotted">Dotted</option><option value="broken">Broken</option><option value="stepped">Stepped</option></select>' +
+      '</div>' +
+      '<div data-show-if="' + prefix + 'SparkChartType:bar">' +
+      '<label class="field-label">Bar style</label>' +
+      '<select data-f="' + prefix + 'SparkBarStyle"><option value="filled">Filled</option><option value="outline">Outline</option></select>' +
+      '</div>' +
+      '<div data-show-if="' + prefix + 'SparkChartType:area">' +
+      '<label class="field-label">Area style</label>' +
+      '<select data-f="' + prefix + 'SparkAreaStyle"><option value="solid">Solid</option><option value="faded">Faded area with highlighted line</option></select>' +
+      '</div>';
+  }
+
+  function renderKpiEditor(kpi) {
+    return '<div class="kpi-editor" data-editor-for="' + kpi.id + '">' +
+      '<h3 class="subsection">Data</h3>' +
+      '<label class="field-label">Worksheet</label>' +
+      '<select data-f="worksheet"></select>' +
+      '<div class="row">' +
+      '<div><label class="field-label">Current period field</label><select data-f="currentField"></select></div>' +
+      '<div><label class="field-label">Label</label><select data-f="labelMode"><option value="custom">Custom text</option><option value="field">From field</option></select></div>' +
+      '</div>' +
+      '<div data-show-if="labelMode:custom"><label class="field-label">Label text</label><input type="text" data-f="customLabel"></div>' +
+      '<div data-show-if="labelMode:field"><label class="field-label">Label field</label><select data-f="labelField"></select></div>' +
+
+      '<label class="field-label">Comparison period</label>' +
+      '<p class="hint">Any field can be the comparison — prior period, prior year, budget, target, whatever the worksheet has.</p>' +
+      '<select data-f="comparisonMode"><option value="none">None</option><option value="field">From field</option><option value="fixed">Fixed value</option></select>' +
+      '<div data-show-if="comparisonMode:field"><label class="field-label">Comparison period field</label><select data-f="comparisonField"></select></div>' +
+      '<div data-show-if="comparisonMode:fixed"><label class="field-label">Comparison period value</label><input type="number" data-f="comparisonFixed"></div>' +
+
+      '<label class="field-label">Which direction is "good"?</label>' +
+      '<select data-f="goodDirection"><option value="up">Up is good</option><option value="down">Down is good</option></select>' +
+
+      '<label class="field-label">Custom prefix <span class="hint">(optional)</span></label>' +
+      '<input type="text" data-f="customPrefix" placeholder="auto (from the field\'s own format)">' +
+
+      '<label class="field-label">Aggregation period</label>' +
+      '<p class="hint">Anything other than "Latest month" needs the current-period Sparkline\'s trend worksheet/date/value fields set below (the sparkline itself doesn\'t need to be visually enabled) - that\'s where the date-bucketed rows come from. The comparison value windows over the same period, from the comparison sparkline\'s trend fields if those are set. The function used to combine the window (sum/average/min/max) is always inferred from the field\'s own name and never overridable - a calculated ratio field (e.g. one measure divided by another) never matches that convention, so it\'s always read as "Latest month" regardless of this setting.</p>' +
+      '<select data-f="aggregationPeriod">' +
+      '<option value="latest">Latest month</option>' +
+      '<option value="last3">Last 3 Months</option>' +
+      '<option value="last6">Last 6 Months</option>' +
+      '<option value="last12">Last 12 Months</option>' +
+      '<option value="qtd">QTD (Quarter to Date)</option>' +
+      '<option value="mtd">MTD (Month to Date)</option>' +
+      '<option value="ytd">YTD (Year to Date)</option>' +
+      '</select>' +
+
+      '<h3 class="subsection">Color</h3>' +
+      '<div data-show-if-global="colorMode:uniform"><p class="hint">Colors are set uniformly for every card - switch "Color mode" to "Individual" on the Color tab to customize per KPI.</p></div>' +
+      '<div data-show-if-global="colorMode:individual">' +
+      '<label class="checkbox"><input type="checkbox" data-f="useCustomColors"> Use custom colors for this card (instead of the global defaults)</label>' +
+      '<div data-show-if="useCustomColors:true">' +
+      '<div class="color-field"><label>"Good" color</label><input type="color" data-f="positiveColor"></div>' +
+      '<div class="color-swatches" data-color-f="positiveColor"></div>' +
+      '<div class="color-field"><label>"Bad" color</label><input type="color" data-f="negativeColor"></div>' +
+      '<div class="color-swatches" data-color-f="negativeColor"></div>' +
+      '</div>' +
+      '<label class="field-label">Accent color</label>' +
+      '<select data-f="accentColorMode">' +
+      '<option value="palette">Cycled from the palette</option>' +
+      '<option value="custom">Fixed color</option>' +
+      '<option value="conditional">Conditional (good/bad, based on this card\'s own performance vs comparison)</option>' +
+      '</select>' +
+      '<div data-show-if="accentColorMode:custom">' +
+      '<div class="color-field"><label>Accent color</label><input type="color" data-f="accentColor"></div>' +
+      '<div class="color-swatches" data-color-f="accentColor"></div>' +
+      '</div>' +
+      '</div>' +
+
+      '<h3 class="subsection">Supporting metrics <span class="hint">(extra context shown under the value, e.g. "vs LY: 12%")</span></h3>' +
+      '<div class="mini-list" data-list="supportingMetrics"></div>' +
+      '<button type="button" class="tiny secondary" data-action="addSupport">+ Add supporting metric</button>' +
+
+      '<h3 class="subsection">Sparkline</h3>' +
+      '<label class="checkbox"><input type="checkbox" data-f="sparklineEnabled"> Enable sparkline trend</label>' +
+      '<div data-show-if="sparklineEnabled:true">' +
+      '<label class="checkbox"><input type="checkbox" data-f="sparkShowYAxis"> Show Y-axis labels (min/max value)</label>' +
+      '<label class="checkbox"><input type="checkbox" data-f="sparkShowXAxis"> Show X-axis labels (first/last date)</label>' +
+      '<div class="series-block current">' +
+      '<h4 class="subsubsection">Current period series</h4>' +
+      '<label class="field-label">Trend worksheet (date-level history)</label><select data-f="trendWorksheet"></select>' +
+      '<div class="row">' +
+      '<div><label class="field-label">Date field</label><select data-f="trendDateField"></select></div>' +
+      '<div><label class="field-label">Value field</label><select data-f="trendValueField"></select></div>' +
+      '</div>' +
+      chartTypeControlsHtml('cur') +
+      '<label class="field-label">Series color</label>' +
+      '<select data-f="curSparkColorMode">' +
+      '<option value="neutral">Neutral (fixed) color</option>' +
+      '<option value="conditional">Conditional (good/bad, based on this card\'s own performance vs comparison)</option>' +
+      '</select>' +
+      '<div data-show-if="curSparkColorMode:neutral">' +
+      '<div class="color-field"><label>Series color</label><input type="color" data-f="curSparkColor"></div>' +
+      '<div class="color-swatches" data-color-f="curSparkColor"></div>' +
+      '</div>' +
+      '</div>' +
+
+      '<label class="checkbox"><input type="checkbox" data-f="comparisonSparkEnabled"> Show comparison period trend on the same sparkline</label>' +
+      '<div data-show-if="comparisonSparkEnabled:true">' +
+      '<div class="series-block comparison">' +
+      '<h4 class="subsubsection">Comparison period series</h4>' +
+      '<label class="field-label">Trend worksheet (date-level history)</label><select data-f="cmpTrendWorksheet"></select>' +
+      '<div class="row">' +
+      '<div><label class="field-label">Date field</label><select data-f="cmpTrendDateField"></select></div>' +
+      '<div><label class="field-label">Value field</label><select data-f="cmpTrendValueField"></select></div>' +
+      '</div>' +
+      chartTypeControlsHtml('cmp') +
+      '<div class="color-field"><label>Series color</label><input type="color" data-f="cmpSparkColor"></div>' +
+      '<div class="color-swatches" data-color-f="cmpSparkColor"></div>' +
+      '</div>' +
+      '</div>' +
+      '</div>' +
+
+      '<h3 class="subsection">KPI tooltip <span class="hint">(shown when hovering the card)</span></h3>' +
+      '<label class="checkbox"><input type="checkbox" data-f="tooltipEnabled"> Enable tooltip</label>' +
+      '<div data-show-if="tooltipEnabled:true">' + tooltipEditorHtml('ban') + '</div>' +
+
+      '<div data-show-if="sparklineEnabled:true">' +
+      '<h3 class="subsection">Sparkline point tooltip <span class="hint">(shown when hovering a point on either trend series)</span></h3>' +
+      '<label class="checkbox"><input type="checkbox" data-f="sparkTooltipEnabled"> Enable sparkline tooltip</label>' +
+      '<div data-show-if="sparkTooltipEnabled:true">' + tooltipEditorHtml('spark') +
+      '<p class="hint">Insert-field list is sourced from the current period\'s trend worksheet. When hovering a comparison-period point, fields with matching names on that worksheet are substituted; others render blank.</p>' +
+      '</div>' +
+      '</div>' +
+
+      '<h3 class="subsection">Caption <span class="hint">(free text shown below the card at all times, not just on hover)</span></h3>' +
+      '<label class="checkbox"><input type="checkbox" data-f="captionEnabled"> Show caption</label>' +
+      '<div data-show-if="captionEnabled:true">' + tooltipEditorHtml('caption') + '</div>' +
+
+      '<h3 class="subsection">Actions on click</h3>' +
+      '<label class="checkbox"><input type="checkbox" data-f="filterEnabled"> Filter other worksheets</label>' +
+      '<div data-show-if="filterEnabled:true">' +
+      '<label class="field-label">Field name to filter on target sheets</label><input type="text" data-f="filterField" placeholder="e.g. Category">' +
+      '<label class="field-label">Value source field (on this card\'s worksheet)</label><select data-f="filterValueField"></select>' +
+      '<label class="field-label">Target worksheets</label><div class="box" data-list="filterWorksheets"></div>' +
+      '</div>' +
+      '<label class="checkbox"><input type="checkbox" data-f="parameterEnabled"> Set a parameter</label>' +
+      '<div data-show-if="parameterEnabled:true">' +
+      '<label class="field-label">Parameter</label><select data-f="parameterName"></select>' +
+      '<label class="field-label">Value to set</label>' +
+      '<select data-f="parameterValueSource"><option value="label">This card\'s label</option><option value="value">This card\'s value</option><option value="fixed">Fixed value</option></select>' +
+      '<div data-show-if="parameterValueSource:fixed"><input type="text" data-f="parameterFixedValue" placeholder="Fixed value"></div>' +
+      '</div>' +
+      '</div>';
+  }
+
+  function tooltipEditorHtml(prefix) {
+    return '<div class="tt-toolbar" data-tt="' + prefix + '">' +
+      '<button type="button" data-cmd="bold" title="Bold"><b>B</b></button>' +
+      '<button type="button" data-cmd="italic" title="Italic"><i>I</i></button>' +
+      '<button type="button" data-cmd="underline" title="Underline"><u>U</u></button>' +
+      '<select data-cmd="fontSize" title="Font size">' +
+      '<option value="10">10px</option><option value="11">11px</option><option value="12" selected>12px</option><option value="14">14px</option><option value="16">16px</option>' +
+      '</select>' +
+      '<input type="color" data-cmd="foreColor" title="Text color" value="#1a1a1a">' +
+      '<button type="button" data-cmd="justifyLeft" title="Align left">&#8676;</button>' +
+      '<button type="button" data-cmd="justifyCenter" title="Align center">&#8596;</button>' +
+      '<select data-cmd="insertField" title="Insert field"><option value="">Insert field...</option></select>' +
+      '<button type="button" data-cmd="reset">Reset</button>' +
+      '</div>' +
+      '<div class="tt-editor" data-tt-editor="' + prefix + '" contenteditable="true"></div>';
+  }
+
+  // ---------- Editor wiring for the currently-open KPI ----------
+  function fieldChip(field) {
+    return '<span class="tt-field" data-tt-field="' + escapeHtml(field) + '" contenteditable="false">&lt;' + escapeHtml(field) + '&gt;</span>';
+  }
+
+  function applyExactFontSize(editorEl, px) {
+    document.execCommand('fontSize', false, '7');
+    editorEl.querySelectorAll('font[size="7"]').forEach(el => {
+      const span = document.createElement('span');
+      span.style.fontSize = px + 'px';
+      while (el.firstChild) span.appendChild(el.firstChild);
+      el.replaceWith(span);
+    });
+  }
+
+  async function wireEditorForOpenKpi() {
+    const kpi = findKpi(openKpiId);
+    if (!kpi) return;
+    const editorRoot = document.querySelector('.kpi-editor[data-editor-for="' + kpi.id + '"]');
+    if (!editorRoot) return;
+
+    // Populate simple field values. Selects tied to dynamically-populated field lists
+    // (worksheet/currentField/labelField/comparisonField/trend*/filterValueField/parameterName)
+    // get their value re-applied once their options are filled in below - setting it here
+    // first is harmless (a value with no matching <option> yet is just ignored).
+    editorRoot.querySelectorAll('[data-f]').forEach(el => {
+      const f = el.getAttribute('data-f');
+      if (el.type === 'checkbox') el.checked = !!kpi[f];
+      else el.value = kpi[f] == null ? '' : kpi[f];
+    });
+    applyShowIf(editorRoot, kpi);
+
+    // Populate worksheet-dependent selects. Each one is synced back to kpi.* after
+    // setting .value - a fresh <select> auto-selects its first option without firing
+    // 'change', so a brand-new KPI (or one whose saved worksheet no longer exists) would
+    // otherwise leave kpi.worksheet empty/stale while the dropdown visibly shows a value,
+    // which then makes fieldsFor() short-circuit to an empty list for every field select.
+    const wsOptions = dashboard.worksheets.map(w => '<option value="' + escapeHtml(w.name) + '">' + escapeHtml(w.name) + '</option>').join('');
+    const wsSelect = editorRoot.querySelector('[data-f="worksheet"]');
+    wsSelect.innerHTML = wsOptions;
+    if (kpi.worksheet && dashboard.worksheets.some(w => w.name === kpi.worksheet)) wsSelect.value = kpi.worksheet;
+    kpi.worksheet = wsSelect.value;
+
+    const trendWsSelect = editorRoot.querySelector('[data-f="trendWorksheet"]');
+    if (trendWsSelect) {
+      trendWsSelect.innerHTML = wsOptions;
+      if (kpi.trendWorksheet && dashboard.worksheets.some(w => w.name === kpi.trendWorksheet)) trendWsSelect.value = kpi.trendWorksheet;
+      kpi.trendWorksheet = trendWsSelect.value;
+    }
+    const cmpTrendWsSelect = editorRoot.querySelector('[data-f="cmpTrendWorksheet"]');
+    if (cmpTrendWsSelect) {
+      cmpTrendWsSelect.innerHTML = wsOptions;
+      if (kpi.cmpTrendWorksheet && dashboard.worksheets.some(w => w.name === kpi.cmpTrendWorksheet)) cmpTrendWsSelect.value = kpi.cmpTrendWorksheet;
+      kpi.cmpTrendWorksheet = cmpTrendWsSelect.value;
+    }
+
+    await refreshWorksheetFields(kpi, editorRoot);
+    if (kpi.sparklineEnabled) await refreshTrendFields(kpi, editorRoot);
+    if (kpi.sparklineEnabled && kpi.comparisonSparkEnabled) await refreshCmpTrendFields(kpi, editorRoot);
+
+    applyGlobalShowIf(); // reflect the current colorMode in this editor's just-inserted color controls
+    renderSupportingMetrics(kpi, editorRoot);
+    renderFilterWorksheets(kpi, editorRoot);
+    await renderParameterSelect(kpi, editorRoot);
+
+    // Tooltip (and caption) editors.
+    const banEditor = editorRoot.querySelector('[data-tt-editor="ban"]');
+    if (banEditor) banEditor.innerHTML = kpi.tooltipTemplate || '';
+    const sparkEditor = editorRoot.querySelector('[data-tt-editor="spark"]');
+    if (sparkEditor) sparkEditor.innerHTML = kpi.sparkTooltipTemplate || '';
+    const captionEditor = editorRoot.querySelector('[data-tt-editor="caption"]');
+    if (captionEditor) captionEditor.innerHTML = kpi.captionTemplate || '';
+    populateInsertField(editorRoot, 'ban', kpi.worksheet);
+    populateInsertField(editorRoot, 'spark', kpi.trendWorksheet);
+    populateInsertField(editorRoot, 'caption', kpi.worksheet);
+
+    renderKpiListLabelsOnly(); // reflect the just-synced kpi.worksheet in the collapsed row header
+    refreshAllColorSwatches();
+
+    bindEditorEvents(kpi, editorRoot);
+  }
+
+  async function refreshWorksheetFields(kpi, editorRoot) {
+    const fields = await fieldsFor(kpi.worksheet);
+    fillSelect(editorRoot.querySelector('[data-f="currentField"]'), fields, false, kpi.currentField);
+    fillSelect(editorRoot.querySelector('[data-f="labelField"]'), fields, false, kpi.labelField);
+    fillSelect(editorRoot.querySelector('[data-f="comparisonField"]'), fields, false, kpi.comparisonField);
+    const fvf = editorRoot.querySelector('[data-f="filterValueField"]');
+    if (fvf) fillSelect(fvf, fields, false, kpi.filterValueField);
+  }
+
+  async function refreshTrendFields(kpi, editorRoot) {
+    const fields = await fieldsFor(kpi.trendWorksheet);
+    fillSelect(editorRoot.querySelector('[data-f="trendDateField"]'), fields, false, kpi.trendDateField);
+    fillSelect(editorRoot.querySelector('[data-f="trendValueField"]'), fields, false, kpi.trendValueField);
+  }
+
+  async function refreshCmpTrendFields(kpi, editorRoot) {
+    const fields = await fieldsFor(kpi.cmpTrendWorksheet);
+    fillSelect(editorRoot.querySelector('[data-f="cmpTrendDateField"]'), fields, false, kpi.cmpTrendDateField);
+    fillSelect(editorRoot.querySelector('[data-f="cmpTrendValueField"]'), fields, false, kpi.cmpTrendValueField);
+  }
+
+  function populateInsertField(editorRoot, prefix, wsName) {
+    const sel = editorRoot.querySelector('[data-tt="' + prefix + '"] [data-cmd="insertField"]');
+    if (!sel) return;
+    const fields = fieldCache[wsName] || [];
+    sel.innerHTML = '<option value="">Insert field...</option>' +
+      fields.map(f => '<option value="' + escapeHtml(f.fieldName) + '">' + escapeHtml(f.fieldName) + '</option>').join('');
+  }
+
+  function renderSupportingMetrics(kpi, editorRoot) {
+    const box = editorRoot.querySelector('[data-list="supportingMetrics"]');
+    const fields = fieldCache[kpi.worksheet] || [];
+    if (!kpi.supportingMetrics.length) {
+      box.innerHTML = '<div class="mini-row"><span class="hint">None yet.</span></div>';
+      return;
+    }
+    box.innerHTML = kpi.supportingMetrics.map((sm, i) => {
+      const opts = fields.map(f => '<option value="' + escapeHtml(f.fieldName) + '"' + (f.fieldName === sm.field ? ' selected' : '') + '>' + escapeHtml(f.fieldName) + '</option>').join('');
+      return '<div class="mini-row" data-sm-index="' + i + '">' +
+        '<select data-sm="field">' + opts + '</select>' +
+        '<input type="text" data-sm="label" value="' + escapeHtml(sm.label) + '" placeholder="Display label">' +
+        '<button type="button" class="tiny" data-action="removeSupport" data-index="' + i + '">&times;</button>' +
+        '</div>';
+    }).join('');
+  }
+
+  function renderFilterWorksheets(kpi, editorRoot) {
+    const box = editorRoot.querySelector('[data-list="filterWorksheets"]');
+    if (!box) return;
+    const candidates = dashboard.worksheets.filter(w => w.name !== kpi.worksheet);
+    box.innerHTML = candidates.map(w => {
+      const checked = kpi.filterWorksheets.includes(w.name);
+      return '<label class="checkbox"><input type="checkbox" data-filter-ws="' + escapeHtml(w.name) + '" ' + (checked ? 'checked' : '') + '>' + escapeHtml(w.name) + '</label>';
+    }).join('') || '<span class="hint">No other worksheets on this dashboard.</span>';
+  }
+
+  async function renderParameterSelect(kpi, editorRoot) {
+    const sel = editorRoot.querySelector('[data-f="parameterName"]');
+    if (!sel) return;
+    sel.innerHTML = dashboardParameters.map(p => '<option value="' + escapeHtml(p.name) + '">' + escapeHtml(p.name) + '</option>').join('') ||
+      '<option value="">No parameters on this workbook</option>';
+    if (kpi.parameterName && dashboardParameters.some(p => p.name === kpi.parameterName)) sel.value = kpi.parameterName;
+  }
+
+  function applyShowIf(editorRoot, kpi) {
+    editorRoot.querySelectorAll('[data-show-if]').forEach(el => {
+      const [field, val] = el.getAttribute('data-show-if').split(':');
+      const current = String(kpi[field]);
+      el.style.display = current === val ? '' : 'none';
+    });
+  }
+
+  // Same idea as applyShowIf, but for top-level cfg fields (e.g. autoFitColumns) rather
+  // than a per-KPI editor's own fields.
+  function applyGlobalShowIf() {
+    document.querySelectorAll('[data-show-if-global]').forEach(el => {
+      const [field, val] = el.getAttribute('data-show-if-global').split(':');
+      const current = String(cfg[field]);
+      el.style.display = current === val ? '' : 'none';
+    });
+  }
+
+  function bindEditorEvents(kpi, editorRoot) {
+    editorRoot.querySelectorAll('[data-f]').forEach(el => {
+      const f = el.getAttribute('data-f');
+      const evt = (el.type === 'checkbox' || el.tagName === 'SELECT') ? 'change' : 'input';
+      el.addEventListener(evt, async () => {
+        if (el.type === 'checkbox') kpi[f] = el.checked;
+        else if (el.type === 'number') kpi[f] = Number(el.value);
+        else kpi[f] = el.value;
+
+        if (f === 'worksheet') { await refreshWorksheetFields(kpi, editorRoot); populateInsertField(editorRoot, 'ban', kpi.worksheet); populateInsertField(editorRoot, 'caption', kpi.worksheet); renderSupportingMetrics(kpi, editorRoot); renderFilterWorksheets(kpi, editorRoot); }
+        if (f === 'trendWorksheet') { await refreshTrendFields(kpi, editorRoot); populateInsertField(editorRoot, 'spark', kpi.trendWorksheet); }
+        if (f === 'cmpTrendWorksheet') { await refreshCmpTrendFields(kpi, editorRoot); }
+        if (f === 'sparklineEnabled' && kpi.sparklineEnabled && kpi.trendWorksheet) await refreshTrendFields(kpi, editorRoot);
+        if (f === 'comparisonSparkEnabled' && kpi.comparisonSparkEnabled && kpi.cmpTrendWorksheet) await refreshCmpTrendFields(kpi, editorRoot);
+
+        syncSwatchSelectionForInput(el);
+        applyShowIf(editorRoot, kpi);
+        renderKpiListLabelsOnly();
+        schedulePreview();
+        validate();
+      });
+    });
+
+    editorRoot.querySelectorAll('[data-filter-ws]').forEach(cb => {
+      cb.addEventListener('change', () => {
+        const wsName = cb.getAttribute('data-filter-ws');
+        if (cb.checked) { if (!kpi.filterWorksheets.includes(wsName)) kpi.filterWorksheets.push(wsName); }
+        else kpi.filterWorksheets = kpi.filterWorksheets.filter(n => n !== wsName);
+      });
+    });
+
+    editorRoot.querySelector('[data-action="addSupport"]').addEventListener('click', () => {
+      kpi.supportingMetrics.push({ field: (fieldCache[kpi.worksheet] || [{}])[0].fieldName || '', label: '' });
+      renderSupportingMetrics(kpi, editorRoot);
+      schedulePreview();
+    });
+    editorRoot.querySelector('[data-list="supportingMetrics"]').addEventListener('click', e => {
+      if (e.target.getAttribute('data-action') !== 'removeSupport') return;
+      const idx = parseInt(e.target.getAttribute('data-index'), 10);
+      kpi.supportingMetrics.splice(idx, 1);
+      renderSupportingMetrics(kpi, editorRoot);
+      schedulePreview();
+    });
+    editorRoot.querySelector('[data-list="supportingMetrics"]').addEventListener('change', e => {
+      const row = e.target.closest('[data-sm-index]');
+      if (!row) return;
+      const idx = parseInt(row.getAttribute('data-sm-index'), 10);
+      const key = e.target.getAttribute('data-sm');
+      if (key) kpi.supportingMetrics[idx][key] = e.target.value;
+      schedulePreview();
+    });
+
+    ['ban', 'spark', 'caption'].forEach(prefix => {
+      const toolbar = editorRoot.querySelector('[data-tt="' + prefix + '"]');
+      const ttEditor = editorRoot.querySelector('[data-tt-editor="' + prefix + '"]');
+      if (!toolbar || !ttEditor) return;
+      const templateKey = { ban: 'tooltipTemplate', spark: 'sparkTooltipTemplate', caption: 'captionTemplate' }[prefix];
+      const sync = () => { kpi[templateKey] = ttEditor.innerHTML; };
+
+      toolbar.querySelectorAll('button[data-cmd]').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const cmd = btn.getAttribute('data-cmd');
+          if (cmd === 'reset') { ttEditor.innerHTML = ''; sync(); return; }
+          ttEditor.focus();
+          document.execCommand(cmd, false, null);
+          sync();
+        });
+      });
+      const fontSizeSel = toolbar.querySelector('select[data-cmd="fontSize"]');
+      if (fontSizeSel) fontSizeSel.addEventListener('change', () => { ttEditor.focus(); applyExactFontSize(ttEditor, fontSizeSel.value); sync(); });
+      const colorInput = toolbar.querySelector('input[data-cmd="foreColor"]');
+      if (colorInput) colorInput.addEventListener('input', () => { ttEditor.focus(); document.execCommand('foreColor', false, colorInput.value); sync(); });
+      const insertSel = toolbar.querySelector('select[data-cmd="insertField"]');
+      if (insertSel) insertSel.addEventListener('change', () => {
+        const field = insertSel.value;
+        if (!field) return;
+        ttEditor.focus();
+        document.execCommand('insertHTML', false, fieldChip(field) + '&nbsp;');
+        insertSel.value = '';
+        sync();
+      });
+      ttEditor.addEventListener('input', sync);
+    });
+  }
+
+  function renderKpiListLabelsOnly() {
+    document.querySelectorAll('.kpi-row').forEach((row, i) => {
+      const kpi = cfg.kpis[i];
+      if (!kpi) return;
+      const nameEl = row.querySelector('.kpi-name');
+      if (nameEl) nameEl.innerHTML = escapeHtml(kpiSummaryLabel(kpi)) + '<span class="kpi-sub">' + (kpi.worksheet ? escapeHtml(kpi.worksheet) : 'no worksheet set') + '</span>';
+    });
+  }
+
+  // ---------- Drag reorder for KPI list ----------
+  function startKpiDrag(e, index) {
+    dragIndex = index;
+    document.body.style.cursor = 'grabbing';
+    const startItem = document.querySelector('.kpi-row[data-index="' + index + '"]');
+    if (startItem) startItem.classList.add('dragging');
+
+    function onMove(ev) {
+      const el = document.elementFromPoint(ev.clientX, ev.clientY);
+      const row = el && el.closest && el.closest('.kpi-row');
+      if (!row) return;
+      const overIndex = parseInt(row.getAttribute('data-index'), 10);
+      if (Number.isNaN(overIndex) || overIndex === dragIndex) return;
+      const [moved] = cfg.kpis.splice(dragIndex, 1);
+      cfg.kpis.splice(overIndex, 0, moved);
+      dragIndex = overIndex;
+      renderKpiList();
+      const newItem = document.querySelector('.kpi-row[data-index="' + dragIndex + '"]');
+      if (newItem) newItem.classList.add('dragging');
+    }
+    function onUp() {
+      document.removeEventListener('mousemove', onMove);
+      document.removeEventListener('mouseup', onUp);
+      document.body.style.cursor = '';
+      document.querySelectorAll('.kpi-row.dragging').forEach(el => el.classList.remove('dragging'));
+      dragIndex = null;
+      schedulePreview();
+    }
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('mouseup', onUp);
+    e.preventDefault();
+  }
+
+  document.getElementById('addKpiBtn').addEventListener('click', () => {
+    const kpi = newKpi();
+    cfg.kpis.push(kpi);
+    openKpiId = kpi.id;
+    renderKpiList();
+    schedulePreview();
+  });
+
+  document.getElementById('kpiList').addEventListener('mousedown', e => {
+    const grip = e.target.closest('.drag-handle');
+    if (!grip) return;
+    const item = grip.closest('.kpi-row');
+    startKpiDrag(e, parseInt(item.getAttribute('data-index'), 10));
+  });
+
+  document.getElementById('kpiList').addEventListener('click', e => {
+    const action = e.target.getAttribute('data-action');
+    if (!action) return;
+    const id = e.target.getAttribute('data-id');
+    if (action === 'edit') {
+      openKpiId = (openKpiId === id) ? null : id;
+      renderKpiList();
+    } else if (action === 'remove') {
+      cfg.kpis = cfg.kpis.filter(k => k.id !== id);
+      if (openKpiId === id) openKpiId = null;
+      renderKpiList();
+      schedulePreview();
+    }
+  });
+
+  // ---------- Global simple bindings ----------
+  function bindSimple(id, key, kind) {
+    const el = document.getElementById(id);
+    el.addEventListener(kind === 'checkbox' ? 'change' : 'input', () => {
+      if (kind === 'checkbox') cfg[key] = el.checked;
+      else if (kind === 'number') cfg[key] = Number(el.value);
+      else cfg[key] = el.value;
+      syncSwatchSelectionForInput(el);
+      applyGlobalShowIf();
+      schedulePreview();
+      validate();
+    });
+  }
+
+  function applyCfgToInputs() {
+    document.getElementById('showTitle').checked = cfg.showTitle;
+    document.getElementById('showConfigureButton').checked = cfg.showConfigureButton;
+    document.getElementById('extTitle').value = cfg.title;
+    document.getElementById('colorMode').value = cfg.colorMode;
+    document.getElementById('accentMode').value = cfg.accentMode;
+    document.getElementById('positiveColor').value = cfg.positiveColor;
+    document.getElementById('negativeColor').value = cfg.negativeColor;
+    document.getElementById('showTrendArrow').checked = cfg.showTrendArrow;
+    document.getElementById('comparisonLabel').value = cfg.comparisonLabel;
+    document.getElementById('cardTransparent').checked = cfg.cardTransparent;
+    document.getElementById('cardBg').value = cfg.cardBg;
+    document.getElementById('cardText').value = cfg.cardText;
+    document.getElementById('fontFamily').value = cfg.fontFamily;
+    document.getElementById('valueFontSize').value = cfg.valueFontSize;
+    document.getElementById('labelFontSize').value = cfg.labelFontSize;
+    document.getElementById('valueFontWeight').value = cfg.valueFontWeight;
+    document.getElementById('autoFitColumns').checked = cfg.autoFitColumns;
+    document.getElementById('cardMinWidth').value = cfg.cardMinWidth;
+    document.getElementById('cardsPerRow').value = cfg.cardsPerRow;
+    document.getElementById('cardGap').value = cfg.cardGap;
+    document.getElementById('cardMinHeight').value = cfg.cardMinHeight;
+    document.getElementById('sparklinePosition').value = cfg.sparklinePosition;
+    document.getElementById('cardStyle').value = cfg.cardStyle;
+    document.getElementById('cornerRadius').value = cfg.cornerRadius;
+  }
+
+  function validate() {
+    const ok = cfg.kpis.length > 0 && cfg.kpis.every(k => k.worksheet && k.currentField && (k.labelMode === 'custom' ? k.customLabel : k.labelField)) && !!cfg.paletteName;
+    document.getElementById('saveBtn').disabled = !ok;
+    showError(ok ? '' : 'Add at least one KPI, and make sure every KPI has a worksheet, current period field, and label set.');
+  }
+
+  async function init() {
+    const openPayload = await tableau.extensions.initializeDialogAsync();
+    dashboard = tableau.extensions.dashboardContent.dashboard;
+
+    let existing = null;
+    try { existing = openPayload ? JSON.parse(openPayload) : null; } catch (_) {}
+    if (existing) {
+      cfg = Object.assign(defaultConfig(), existing);
+      cfg.kpis = Array.isArray(existing.kpis) ? existing.kpis.map(k => Object.assign(newKpi(), k)) : [];
+    }
+
+    try {
+      const params = await dashboard.getParametersAsync();
+      dashboardParameters = params.map(p => ({ name: p.name }));
+    } catch (e) { dashboardParameters = []; }
+
+    // Warm the field cache for every worksheet already referenced by saved KPIs.
+    const wsNames = new Set();
+    cfg.kpis.forEach(k => {
+      if (k.worksheet) wsNames.add(k.worksheet);
+      if (k.trendWorksheet) wsNames.add(k.trendWorksheet);
+      if (k.cmpTrendWorksheet) wsNames.add(k.cmpTrendWorksheet);
+    });
+    await Promise.all(Array.from(wsNames).map(fieldsFor));
+
+    applyCfgToInputs();
+    applyGlobalShowIf();
+    renderPaletteList('');
+    refreshAllColorSwatches();
+    renderKpiList();
+    renderPreview();
+
+    bindSimple('showTitle', 'showTitle', 'checkbox');
+    bindSimple('showConfigureButton', 'showConfigureButton', 'checkbox');
+    bindSimple('extTitle', 'title', 'text');
+    bindSimple('colorMode', 'colorMode', 'text');
+    bindSimple('accentMode', 'accentMode', 'text');
+    bindSimple('positiveColor', 'positiveColor', 'text');
+    bindSimple('negativeColor', 'negativeColor', 'text');
+    bindSimple('showTrendArrow', 'showTrendArrow', 'checkbox');
+    bindSimple('comparisonLabel', 'comparisonLabel', 'text');
+    bindSimple('cardTransparent', 'cardTransparent', 'checkbox');
+    bindSimple('cardBg', 'cardBg', 'text');
+    bindSimple('cardText', 'cardText', 'text');
+    bindSimple('fontFamily', 'fontFamily', 'text');
+    bindSimple('valueFontSize', 'valueFontSize', 'number');
+    bindSimple('labelFontSize', 'labelFontSize', 'number');
+    bindSimple('valueFontWeight', 'valueFontWeight', 'text');
+    bindSimple('autoFitColumns', 'autoFitColumns', 'checkbox');
+    bindSimple('cardMinWidth', 'cardMinWidth', 'number');
+    bindSimple('cardsPerRow', 'cardsPerRow', 'number');
+    bindSimple('cardGap', 'cardGap', 'number');
+    bindSimple('cardMinHeight', 'cardMinHeight', 'number');
+    bindSimple('sparklinePosition', 'sparklinePosition', 'text');
+    bindSimple('cardStyle', 'cardStyle', 'text');
+    bindSimple('cornerRadius', 'cornerRadius', 'number');
+
+    validate();
+
+    document.getElementById('saveBtn').addEventListener('click', () => {
+      tableau.extensions.ui.closeDialog(JSON.stringify(cfg));
+    });
+    document.getElementById('cancelBtn').addEventListener('click', () => {
+      tableau.extensions.ui.closeDialog('');
+    });
+  }
+
+  init().catch(e => showError('Failed to load: ' + e.message));
+</script>
+</body>
+</html>
